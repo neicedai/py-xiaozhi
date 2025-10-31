@@ -19,10 +19,16 @@ class Camera:
         self.jpeg_data = {"buf": b"", "len": 0}  # 图像的JPEG字节数据  # 字节数据长度
 
         # 从配置中读取相机参数
+        self._refresh_camera_settings()
+
+    def _refresh_camera_settings(self):
+        """Reload camera related configuration values."""
+
         config = ConfigManager.get_instance()
         self.camera_index = config.get_config("CAMERA.camera_index", 0)
         self.frame_width = config.get_config("CAMERA.frame_width", 640)
         self.frame_height = config.get_config("CAMERA.frame_height", 480)
+        self.fps = config.get_config("CAMERA.fps", 30)
 
     @classmethod
     def get_instance(cls):
@@ -60,6 +66,9 @@ class Camera:
         """
         try:
             logger.info("Accessing camera...")
+
+            # Ensure the latest camera configuration is applied
+            self._refresh_camera_settings()
 
             # 尝试打开摄像头
             cap = cv2.VideoCapture(self.camera_index)
