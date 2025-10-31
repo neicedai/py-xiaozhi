@@ -19,6 +19,7 @@ from PyQt5.QtWidgets import (
 
 from src.utils.config_manager import ConfigManager
 from src.utils.logging_config import get_logger
+from src.mcp.tools.camera.image_enhancement import enhance_frame_brightness
 
 
 class CameraWidget(QWidget):
@@ -501,6 +502,8 @@ class CameraWidget(QWidget):
                 self._show_preview_error("无法读取摄像头画面")
                 return
 
+            # 提升画面亮度后再转换颜色空间 BGR -> RGB
+            frame = enhance_frame_brightness(frame)
             # 转换颜色空间 BGR -> RGB
             rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 

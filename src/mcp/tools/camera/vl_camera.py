@@ -11,6 +11,7 @@ from src.utils.config_manager import ConfigManager
 from src.utils.logging_config import get_logger
 
 from .base_camera import BaseCamera
+from .image_enhancement import enhance_frame_brightness
 
 logger = get_logger(__name__)
 
@@ -78,6 +79,9 @@ class VLCamera(BaseCamera):
             if not ret:
                 logger.error("Failed to capture image")
                 return False
+
+            # 提升画面亮度，增强低光场景的清晰度
+            frame = enhance_frame_brightness(frame)
 
             # 获取原始图像尺寸
             height, width = frame.shape[:2]

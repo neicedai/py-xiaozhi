@@ -5,6 +5,7 @@ import requests
 
 from src.utils.config_manager import ConfigManager
 from src.utils.logging_config import get_logger
+from src.mcp.tools.camera.image_enhancement import enhance_frame_brightness
 
 logger = get_logger(__name__)
 
@@ -87,6 +88,9 @@ class Camera:
             if not ret:
                 logger.error("Failed to capture image")
                 return False
+
+            # 提升画面亮度，改善在低光环境下的成像效果
+            frame = enhance_frame_brightness(frame)
 
             # 获取原始图像尺寸
             height, width = frame.shape[:2]
