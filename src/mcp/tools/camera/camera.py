@@ -19,10 +19,38 @@ class Camera:
         self.jpeg_data = {"buf": b"", "len": 0}  # 图像的JPEG字节数据  # 字节数据长度
 
         # 从配置中读取相机参数
+        self._refresh_camera_settings()
+
+    def _refresh_camera_settings(self):
+        """Reload camera related configuration values."""
+
         config = ConfigManager.get_instance()
         self.camera_index = config.get_config("CAMERA.camera_index", 0)
         self.frame_width = config.get_config("CAMERA.frame_width", 640)
         self.frame_height = config.get_config("CAMERA.frame_height", 480)
+        self.fps = config.get_config("CAMERA.fps", 30)
+        auto_brightness = config.get_config("CAMERA.auto_brightness", True)
+        if isinstance(auto_brightness, str):
+            auto_brightness = auto_brightness.strip().lower() in {
+                "1",
+                "true",
+                "yes",
+                "on",
+            }
+        self.auto_brightness = bool(auto_brightness)
+
+        def _to_float(value, default: float) -> float:
+            try:
+                return float(value)
+            except (TypeError, ValueError):
+                return default
+
+        self.brightness_alpha = _to_float(
+            config.get_config("CAMERA.brightness_alpha", 1.2), 1.2
+        )
+        self.brightness_beta = _to_float(
+            config.get_config("CAMERA.brightness_beta", 15), 15
+        )
 
     @classmethod
     def get_instance(cls):
@@ -61,6 +89,9 @@ class Camera:
         try:
             logger.info("Accessing camera...")
 
+            # Ensure the latest camera configuration is applied
+            self._refresh_camera_settings()
+
             # 尝试打开摄像头
             cap = cv2.VideoCapture(self.camera_index)
             if not cap.isOpened():
@@ -78,6 +109,11 @@ class Camera:
             if not ret:
                 logger.error("Failed to capture image")
                 return False
+
+            if getattr(self, "auto_brightness", False):
+                frame = cv2.convertScaleAbs(
+                    frame, alpha=self.brightness_alpha, beta=self.brightness_beta
+                )
 
             # 获取原始图像尺寸
             height, width = frame.shape[:2]

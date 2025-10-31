@@ -58,6 +58,9 @@ class VLCamera(BaseCamera):
         try:
             logger.info("Accessing camera...")
 
+            # Ensure the latest camera settings are loaded from config
+            self.refresh_settings()
+
             # 尝试打开摄像头
             cap = cv2.VideoCapture(self.camera_index)
             if not cap.isOpened():
@@ -75,6 +78,11 @@ class VLCamera(BaseCamera):
             if not ret:
                 logger.error("Failed to capture image")
                 return False
+
+            if getattr(self, "auto_brightness", False):
+                frame = cv2.convertScaleAbs(
+                    frame, alpha=self.brightness_alpha, beta=self.brightness_beta
+                )
 
             # 获取原始图像尺寸
             height, width = frame.shape[:2]
