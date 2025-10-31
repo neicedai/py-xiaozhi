@@ -58,6 +58,9 @@ class VLCamera(BaseCamera):
         try:
             logger.info("Accessing camera...")
 
+            # Ensure the latest camera settings are loaded from config
+            self.refresh_settings()
+
             # 尝试打开摄像头
             cap = cv2.VideoCapture(self.camera_index)
             if not cap.isOpened():
