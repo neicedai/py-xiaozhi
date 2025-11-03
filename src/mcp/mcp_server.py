@@ -279,7 +279,14 @@ class McpServer:
         music_manager.init_tools(self.add_tool, PropertyList, Property, PropertyType)
 
         # 添加摄像头工具
-        from src.mcp.tools.camera import take_photo
+        from src.mcp.tools.camera import initialize_camera, take_photo
+
+        # 在程序启动阶段初始化摄像头，保持持续连接
+        try:
+            initialize_camera(force_reopen=True)
+            logger.info("Camera initialized during MCP setup")
+        except Exception as exc:
+            logger.error(f"Failed to initialize camera on startup: {exc}")
 
         # 注册take_photo工具
         properties = PropertyList([Property("question", PropertyType.STRING)])

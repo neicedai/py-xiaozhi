@@ -1,6 +1,4 @@
-"""
-Normal camera implementation using remote API.
-"""
+"""Normal camera implementation using remote API."""
 
 import cv2
 import requests
@@ -28,6 +26,8 @@ class NormalCamera(BaseCamera):
         super().__init__()
         self.explain_url = ""
         self.explain_token = ""
+        # 在初始化阶段打开摄像头，保持持续连接
+        self.initialize_capture(force_open=True)
 
     @classmethod
     def get_instance(cls):
@@ -60,27 +60,15 @@ class NormalCamera(BaseCamera):
         捕获图像.
         """
         try:
-            logger.info("Accessing camera...")
+            logger.info("Capturing frame from persistent camera stream...")
 
-            # Ensure the latest camera settings are loaded from config
+            # 重新加载配置，并在需要时重建连接
             self.refresh_settings()
-
-            # 尝试打开摄像头
-            cap = cv2.VideoCapture(self.camera_index)
-            if not cap.isOpened():
-                logger.error(f"Cannot open camera at index {self.camera_index}")
+            if not self.initialize_capture():
                 return False
 
-            # 设置摄像头参数
-            cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.frame_width)
-            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.frame_height)
-
-            # 读取图像
-            ret, frame = cap.read()
-            cap.release()
-
-            if not ret:
-                logger.error("Failed to capture image")
+            frame = self.read_frame()
+            if frame is None:
                 return False
 
             # 提升画面亮度，增强低光场景的清晰度
@@ -118,6 +106,13 @@ class NormalCamera(BaseCamera):
         except Exception as e:
             logger.error(f"Exception during capture: {e}")
             return False
+
+    def read_preview_frame(self):
+        """读取用于预览的原始帧."""
+
+        if not self.initialize_capture():
+            return None
+        return self.read_frame()
 
     def analyze(self, question: str) -> str:
         """
