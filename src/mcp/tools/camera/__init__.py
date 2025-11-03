@@ -61,9 +61,20 @@ def get_camera_status() -> str:
 
 
 def read_camera_preview_frame():
-    """Read a frame for UI preview usage."""
+    """Read a frame for UI preview usage without reopening closed cameras."""
+
+    global _camera_initialized
+
+    if not _camera_initialized:
+        return None
 
     camera = get_camera_instance()
+
+    if not camera.is_active():
+        if camera.initialize_capture(force_open=True):
+            return camera.read_preview_frame()
+        return None
+
     return camera.read_preview_frame()
 
 
