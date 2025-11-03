@@ -118,7 +118,7 @@ class KeywordGenerator:
         # 如果有缺失的token，给出警告
         if missing_tokens:
             print(f"⚠️  警告: 以下token不在tokens.txt中: {', '.join(set(missing_tokens))}")
-            print(f"   生成的关键词可能无法正常工作")
+            print("   生成的关键词可能无法正常工作")
 
         return keyword_line
 
@@ -293,7 +293,7 @@ def main():
     # 执行操作
     if args.test:
         # 测试模式
-        print(f"\n🧪 测试转换:")
+        print("\n🧪 测试转换:")
         keyword_line = generator.chinese_to_keyword_format(args.test)
         print(f"   输入: {args.test}")
         print(f"   输出: {keyword_line}")

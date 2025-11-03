@@ -63,8 +63,6 @@ def get_camera_status() -> str:
 def read_camera_preview_frame():
     """Read a frame for UI preview usage without reopening closed cameras."""
 
-    global _camera_initialized
-
     if not _camera_initialized:
         return None
 
