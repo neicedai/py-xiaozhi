@@ -171,6 +171,8 @@ class GuiDisplay(BaseDisplay, QObject, metaclass=CombinedMeta):
         # 摄像头预览相关
         self._camera_preview_window: Optional[CameraPreviewWindow] = None
         self._camera_status_timer: Optional[QTimer] = None
+        self._preview_desired: bool = False
+        self._suppress_preview_toggle: bool = False
 
     # =========================================================================
     # 公共 API - 回调与更新
@@ -537,21 +539,25 @@ class GuiDisplay(BaseDisplay, QObject, metaclass=CombinedMeta):
         self.display_model.set_auto_mode(self.auto_mode)
 
     def _on_camera_preview_toggled(self, visible: bool):
+        if self._suppress_preview_toggle:
+            return
+        self._preview_desired = visible
         if visible:
             if not self.display_model.cameraEnabled:
                 self._on_camera_power_toggled(True)
                 if not self.display_model.cameraEnabled:
-                    self.display_model.set_camera_preview_visible(False)
+                    self._set_camera_preview_visible(False)
                     return
             if not self._camera_preview_window:
                 self._initialize_camera_support()
             if self._camera_preview_window:
                 self._camera_preview_window.show_preview()
-                self.display_model.set_camera_preview_visible(True)
+                self._set_camera_preview_visible(True)
         else:
             if self._camera_preview_window:
-                self._camera_preview_window.hide_preview()
-            self.display_model.set_camera_preview_visible(False)
+                if self._camera_preview_window.isVisible():
+                    self._camera_preview_window.hide_preview()
+            self._set_camera_preview_visible(False)
 
     def _on_camera_power_toggled(self, enabled: bool):
         if enabled:
@@ -572,7 +578,7 @@ class GuiDisplay(BaseDisplay, QObject, metaclass=CombinedMeta):
                 self.logger.error("Failed to shutdown camera: %s", exc, exc_info=True)
             if self._camera_preview_window:
                 self._camera_preview_window.hide_preview()
-            self.display_model.set_camera_preview_visible(False)
+            self._set_camera_preview_visible(False)
             self.display_model.set_camera_enabled(False)
             self.display_model.update_camera_status(get_camera_status())
 
@@ -615,7 +621,7 @@ class GuiDisplay(BaseDisplay, QObject, metaclass=CombinedMeta):
             camera = initialize_camera()
             self.display_model.update_camera_status(get_camera_status())
             self.display_model.set_camera_enabled(is_camera_active())
-            self.display_model.set_camera_preview_visible(False)
+            self._set_camera_preview_visible(False)
             window = CameraPreviewWindow(
                 fps_provider=lambda: getattr(camera, "fps", 30),
                 visibility_callback=self._on_preview_visibility_changed,
@@ -628,7 +634,16 @@ class GuiDisplay(BaseDisplay, QObject, metaclass=CombinedMeta):
             self.display_model.update_camera_status(f"摄像头: 初始化失败({exc})")
 
     def _on_preview_visibility_changed(self, visible: bool):
-        self.display_model.set_camera_preview_visible(visible)
+        self._set_camera_preview_visible(visible)
+
+    def _set_camera_preview_visible(self, visible: bool):
+        if self.display_model.cameraPreviewVisible == visible:
+            return
+        self._suppress_preview_toggle = True
+        try:
+            self.display_model.set_camera_preview_visible(visible)
+        finally:
+            self._suppress_preview_toggle = False
 
     def _refresh_camera_status(self):
         try:
@@ -638,6 +653,14 @@ class GuiDisplay(BaseDisplay, QObject, metaclass=CombinedMeta):
             self.display_model.set_camera_enabled(active)
             if not active and self._camera_preview_window:
                 self._camera_preview_window.hide_preview()
+            elif (
+                active
+                and self._preview_desired
+                and self._camera_preview_window
+                and not self._camera_preview_window.isVisible()
+            ):
+                self._camera_preview_window.show_preview()
+                self._set_camera_preview_visible(True)
         except Exception as exc:
             self.display_model.update_camera_status(f"摄像头: 状态未知({exc})")
 
