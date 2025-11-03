@@ -1,9 +1,12 @@
 from pathlib import Path
+from typing import Dict, Optional
 
 from PyQt5.QtCore import pyqtSignal
 from PyQt5.QtWidgets import (
     QCheckBox,
+    QComboBox,
     QFileDialog,
+    QLabel,
     QLineEdit,
     QMessageBox,
     QPushButton,
@@ -38,6 +41,7 @@ class WakeWordWidget(QWidget):
 
         # UI控件引用
         self.ui_controls = {}
+        self.preset_descriptions: Dict[str, str] = {}
 
         # 声母表（用于拼音分割）
         self.initials = [
@@ -49,6 +53,7 @@ class WakeWordWidget(QWidget):
         # 初始化UI
         self._setup_ui()
         self._connect_events()
+        self._populate_presets()
         self._load_config_values()
 
     def _setup_ui(self):
@@ -75,6 +80,8 @@ class WakeWordWidget(QWidget):
         self.ui_controls.update(
             {
                 "use_wake_word_check": self.findChild(QCheckBox, "use_wake_word_check"),
+                "preset_combo_box": self.findChild(QComboBox, "preset_combo_box"),
+                "preset_description_label": self.findChild(QLabel, "preset_description_label"),
                 "model_path_edit": self.findChild(QLineEdit, "model_path_edit"),
                 "model_path_btn": self.findChild(QPushButton, "model_path_btn"),
                 "wake_words_edit": self.findChild(QTextEdit, "wake_words_edit"),
@@ -88,6 +95,11 @@ class WakeWordWidget(QWidget):
         if self.ui_controls["use_wake_word_check"]:
             self.ui_controls["use_wake_word_check"].toggled.connect(
                 self.settings_changed.emit
+            )
+
+        if self.ui_controls["preset_combo_box"]:
+            self.ui_controls["preset_combo_box"].currentIndexChanged.connect(
+                self._on_preset_changed
             )
 
         if self.ui_controls["model_path_edit"]:
@@ -121,6 +133,11 @@ class WakeWordWidget(QWidget):
                 "WAKE_WORD_OPTIONS.MODEL_PATH", ""
             )
             self._set_text_value("model_path_edit", model_path)
+
+            preset_key = self.config_manager.get_config(
+                "WAKE_WORD_OPTIONS.ACTIVE_PRESET", "balanced"
+            )
+            self._select_preset(preset_key)
 
             # 从 keywords.txt 文件读取唤醒词
             wake_words_text = self._load_keywords_from_file()
@@ -391,6 +408,10 @@ class WakeWordWidget(QWidget):
                 relative_path = self._convert_to_relative_path(model_path)
                 config_data["WAKE_WORD_OPTIONS.MODEL_PATH"] = relative_path
 
+            preset_key = self._get_current_preset_key()
+            if preset_key:
+                config_data["WAKE_WORD_OPTIONS.ACTIVE_PRESET"] = preset_key
+
         except Exception as e:
             self.logger.error(f"获取唤醒词配置数据失败: {e}", exc_info=True)
 
@@ -419,6 +440,8 @@ class WakeWordWidget(QWidget):
                     wake_word_config["USE_WAKE_WORD"]
                 )
 
+            self._select_preset(wake_word_config.get("ACTIVE_PRESET", "balanced"))
+
             self._set_text_value("model_path_edit", wake_word_config["MODEL_PATH"])
 
             if self.ui_controls["wake_words_edit"]:
@@ -444,3 +467,77 @@ class WakeWordWidget(QWidget):
             "贾维斯",
         ]
         return "\n".join(default_keywords)
+
+    def _populate_presets(self):
+        """根据配置填充预设选项."""
+
+        combo: Optional[QComboBox] = self.ui_controls.get("preset_combo_box")
+        if not combo:
+            return
+
+        presets = self.config_manager.get_config("WAKE_WORD_OPTIONS.PRESETS", {})
+        self.preset_descriptions = {}
+
+        combo.blockSignals(True)
+        combo.clear()
+
+        if isinstance(presets, dict):
+            for key, preset in presets.items():
+                if not isinstance(preset, dict):
+                    continue
+
+                label = preset.get("label") or key
+                combo.addItem(label, key)
+                self.preset_descriptions[key] = preset.get("description", "")
+
+        combo.blockSignals(False)
+
+    def _select_preset(self, preset_key: Optional[str]):
+        combo: Optional[QComboBox] = self.ui_controls.get("preset_combo_box")
+        if not combo or combo.count() == 0:
+            return
+
+        if preset_key is None:
+            preset_key = combo.itemData(combo.currentIndex())
+
+        target_index = -1
+        for index in range(combo.count()):
+            if combo.itemData(index) == preset_key:
+                target_index = index
+                break
+
+        if target_index < 0:
+            target_index = 0
+
+        previous_state = combo.blockSignals(True)
+        combo.setCurrentIndex(target_index)
+        combo.blockSignals(previous_state)
+
+        current_key = combo.itemData(target_index)
+        self._update_preset_description(current_key)
+
+    def _on_preset_changed(self):
+        preset_key = self._get_current_preset_key()
+        self._update_preset_description(preset_key)
+        self.settings_changed.emit()
+
+    def _get_current_preset_key(self) -> Optional[str]:
+        combo: Optional[QComboBox] = self.ui_controls.get("preset_combo_box")
+        if combo and combo.currentIndex() >= 0:
+            return combo.currentData()
+        return None
+
+    def _update_preset_description(self, preset_key: Optional[str]):
+        label: Optional[QLabel] = self.ui_controls.get("preset_description_label")
+        if not label:
+            return
+
+        if not preset_key:
+            label.setText("根据环境选择不同的预设以优化唤醒效果。")
+            return
+
+        description = self.preset_descriptions.get(preset_key)
+        if description:
+            label.setText(description)
+        else:
+            label.setText("根据环境选择不同的预设以优化唤醒效果。")
