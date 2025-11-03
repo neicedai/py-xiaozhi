@@ -40,6 +40,7 @@ class VLCamera(BaseCamera):
         )
         self.model = config.get_config("CAMERA.models", "glm-4v-plus")
         logger.info(f"VL Camera initialized with model: {self.model}")
+        self.initialize_capture(force_open=True)
 
     @classmethod
     def get_instance(cls):
@@ -61,23 +62,11 @@ class VLCamera(BaseCamera):
 
             # Ensure the latest camera settings are loaded from config
             self.refresh_settings()
-
-            # 尝试打开摄像头
-            cap = cv2.VideoCapture(self.camera_index)
-            if not cap.isOpened():
-                logger.error(f"Cannot open camera at index {self.camera_index}")
+            if not self.initialize_capture():
                 return False
 
-            # 设置摄像头参数
-            cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.frame_width)
-            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.frame_height)
-
-            # 读取图像
-            ret, frame = cap.read()
-            cap.release()
-
-            if not ret:
-                logger.error("Failed to capture image")
+            frame = self.read_frame()
+            if frame is None:
                 return False
 
             # 提升画面亮度，增强低光场景的清晰度

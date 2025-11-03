@@ -18,6 +18,8 @@ class GuiDisplayModel(QObject):
     buttonTextChanged = pyqtSignal()
     modeTextChanged = pyqtSignal()
     autoModeChanged = pyqtSignal()
+    cameraStatusChanged = pyqtSignal()
+    cameraPreviewVisibleChanged = pyqtSignal()
 
     # 用户操作信号
     manualButtonPressed = pyqtSignal()
@@ -39,6 +41,8 @@ class GuiDisplayModel(QObject):
         self._mode_text = "手动对话"  # 模式切换按钮文本
         self._auto_mode = False  # 是否自动模式
         self._is_connected = False
+        self._camera_status = "摄像头: 未初始化"
+        self._camera_preview_visible = False
 
     # 状态文本属性
     @pyqtProperty(str, notify=statusTextChanged)
@@ -147,3 +151,30 @@ class GuiDisplayModel(QObject):
             self.modeText = "自动对话"
         else:
             self.modeText = "手动对话"
+
+    # 摄像头信息
+    @pyqtProperty(str, notify=cameraStatusChanged)
+    def cameraStatus(self):
+        return self._camera_status
+
+    @cameraStatus.setter
+    def cameraStatus(self, value):
+        if self._camera_status != value:
+            self._camera_status = value
+            self.cameraStatusChanged.emit()
+
+    @pyqtProperty(bool, notify=cameraPreviewVisibleChanged)
+    def cameraPreviewVisible(self):
+        return self._camera_preview_visible
+
+    @cameraPreviewVisible.setter
+    def cameraPreviewVisible(self, value):
+        if self._camera_preview_visible != value:
+            self._camera_preview_visible = value
+            self.cameraPreviewVisibleChanged.emit()
+
+    def update_camera_status(self, status: str):
+        self.cameraStatus = status
+
+    def set_camera_preview_visible(self, visible: bool):
+        self.cameraPreviewVisible = visible

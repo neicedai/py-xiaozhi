@@ -23,6 +23,7 @@ Rectangle {
     signal titleDragStart(real mouseX, real mouseY)
     signal titleDragMoveTo(real mouseX, real mouseY)
     signal titleDragEnd()
+    signal cameraPreviewToggled(bool visible)
 
     // 主布局
     ColumnLayout {
@@ -125,6 +126,34 @@ Rectangle {
                         font.pixelSize: 14
                         font.weight: Font.Bold
                         color: "#2196F3"
+                    }
+                }
+
+                // 摄像头状态与预览开关
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 36
+                    spacing: 12
+
+                    Text {
+                        Layout.fillWidth: true
+                        text: displayModel ? displayModel.cameraStatus : "摄像头: 未初始化"
+                        font.pixelSize: 12
+                        color: "#4e5969"
+                        verticalAlignment: Text.AlignVCenter
+                        elide: Text.ElideRight
+                    }
+
+                    Switch {
+                        id: cameraPreviewSwitch
+                        text: checked ? "隐藏预览" : "显示预览"
+                        onToggled: root.cameraPreviewToggled(checked)
+
+                        Binding {
+                            target: cameraPreviewSwitch
+                            property: "checked"
+                            value: displayModel ? displayModel.cameraPreviewVisible : false
+                        }
                     }
                 }
 

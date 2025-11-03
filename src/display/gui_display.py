@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
-"""
-GUI 显示模块 - 使用 QML 实现.
-"""
+"""GUI 显示模块 - 使用 QML 实现."""
 
 import asyncio
 import os
@@ -10,19 +8,116 @@ from abc import ABCMeta
 from pathlib import Path
 from typing import Callable, Optional
 
+import cv2
 from PyQt5.QtCore import QObject, Qt, QTimer, QUrl
-from PyQt5.QtGui import QCursor, QFont
+from PyQt5.QtGui import QCursor, QFont, QImage, QPixmap
 from PyQt5.QtQuickWidgets import QQuickWidget
-from PyQt5.QtWidgets import QApplication, QVBoxLayout, QWidget
+from PyQt5.QtWidgets import QApplication, QLabel, QVBoxLayout, QWidget
 
 from src.display.base_display import BaseDisplay
 from src.display.gui_display_model import GuiDisplayModel
+from src.mcp.tools.camera import (
+    get_camera_status,
+    initialize_camera,
+    read_camera_preview_frame,
+)
+from src.mcp.tools.camera.image_enhancement import enhance_frame_brightness
 from src.utils.resource_finder import find_assets_dir
 
 
 # 创建兼容的元类
 class CombinedMeta(type(QObject), ABCMeta):
     pass
+
+
+class CameraPreviewWindow(QWidget):
+    """小型摄像头预览窗口."""
+
+    def __init__(self, fps_provider, visibility_callback=None, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("摄像头预览")
+        self.setWindowFlags(Qt.Tool | Qt.WindowStaysOnTopHint)
+        self.resize(360, 240)
+
+        self._label = QLabel("正在初始化摄像头…", self)
+        self._label.setAlignment(Qt.AlignCenter)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.addWidget(self._label)
+
+        self._timer = QTimer(self)
+        self._timer.timeout.connect(self._update_frame)
+        self._current_image: Optional[QImage] = None
+        self._visibility_callback = visibility_callback
+        self._fps_provider = fps_provider
+
+    def set_visibility_callback(self, callback):
+        self._visibility_callback = callback
+
+    def show_preview(self):
+        interval = 100
+        try:
+            fps = max(1, int(self._fps_provider()))
+            interval = max(30, int(1000 / fps))
+        except Exception:
+            pass
+        self._timer.start(interval)
+        self.show()
+        self.raise_()
+
+    def hide_preview(self):
+        self._timer.stop()
+        self.hide()
+        if self._visibility_callback:
+            self._visibility_callback(False)
+
+    def closeEvent(self, event):
+        self.hide_preview()
+        event.accept()
+
+    def _update_frame(self):
+        try:
+            frame = read_camera_preview_frame()
+            if frame is None:
+                self._show_placeholder("无法读取摄像头画面")
+                return
+
+            frame = enhance_frame_brightness(frame)
+            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            image = QImage(
+                rgb.data,
+                rgb.shape[1],
+                rgb.shape[0],
+                rgb.strides[0],
+                QImage.Format_RGB888,
+            )
+            self._current_image = image.copy()
+            pixmap = QPixmap.fromImage(self._current_image)
+            self._label.setPixmap(
+                pixmap.scaled(
+                    self._label.size(),
+                    Qt.KeepAspectRatio,
+                    Qt.SmoothTransformation,
+                )
+            )
+        except Exception as exc:
+            self._show_placeholder(f"预览出错: {exc}")
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if self._current_image:
+            pixmap = QPixmap.fromImage(self._current_image)
+            self._label.setPixmap(
+                pixmap.scaled(
+                    self._label.size(),
+                    Qt.KeepAspectRatio,
+                    Qt.SmoothTransformation,
+                )
+            )
+
+    def _show_placeholder(self, message: str):
+        self._label.setText(message)
+        self._label.setPixmap(QPixmap())
 
 
 class GuiDisplay(BaseDisplay, QObject, metaclass=CombinedMeta):
@@ -70,6 +165,10 @@ class GuiDisplay(BaseDisplay, QObject, metaclass=CombinedMeta):
             "abort": None,
             "send_text": None,
         }
+
+        # 摄像头预览相关
+        self._camera_preview_window: Optional[CameraPreviewWindow] = None
+        self._camera_status_timer: Optional[QTimer] = None
 
     # =========================================================================
     # 公共 API - 回调与更新
@@ -189,6 +288,11 @@ class GuiDisplay(BaseDisplay, QObject, metaclass=CombinedMeta):
             self.system_tray.hide()
         if self.root:
             self.root.close()
+        if self._camera_status_timer:
+            self._camera_status_timer.stop()
+            self._camera_status_timer = None
+        if self._camera_preview_window:
+            self._camera_preview_window.hide_preview()
 
     # =========================================================================
     # 启动流程
@@ -202,6 +306,7 @@ class GuiDisplay(BaseDisplay, QObject, metaclass=CombinedMeta):
             self._configure_environment()
             self._create_main_window()
             self._load_qml()
+            self._initialize_camera_support()
             self._setup_interactions()
             await self._finalize_startup()
         except Exception as e:
@@ -335,6 +440,7 @@ class GuiDisplay(BaseDisplay, QObject, metaclass=CombinedMeta):
             self.root.show()
 
         self._setup_system_tray()
+        self._start_camera_status_timer()
 
     # =========================================================================
     # 信号连接
@@ -375,6 +481,11 @@ class GuiDisplay(BaseDisplay, QObject, metaclass=CombinedMeta):
                 getattr(root_object, signal_name).connect(handler)
             except AttributeError:
                 self.logger.debug(f"信号 {signal_name} 不存在（可能是可选功能）")
+
+        try:
+            root_object.cameraPreviewToggled.connect(self._on_camera_preview_toggled)
+        except AttributeError:
+            self.logger.debug("摄像头预览信号未定义")
 
         self.logger.debug("QML 信号连接设置完成")
 
@@ -418,6 +529,18 @@ class GuiDisplay(BaseDisplay, QObject, metaclass=CombinedMeta):
         self.display_model.update_mode_text(mode_text)
         self.display_model.set_auto_mode(self.auto_mode)
 
+    def _on_camera_preview_toggled(self, visible: bool):
+        if visible:
+            if not self._camera_preview_window:
+                self._initialize_camera_support()
+            if self._camera_preview_window:
+                self._camera_preview_window.show_preview()
+                self.display_model.set_camera_preview_visible(True)
+        else:
+            if self._camera_preview_window:
+                self._camera_preview_window.hide_preview()
+            self.display_model.set_camera_preview_visible(False)
+
     def _on_send_button_click(self, text: str):
         """
         处理发送文本按钮点击.
@@ -449,6 +572,44 @@ class GuiDisplay(BaseDisplay, QObject, metaclass=CombinedMeta):
             settings_window.exec_()
         except Exception as e:
             self.logger.error(f"打开设置窗口失败: {e}", exc_info=True)
+
+    def _initialize_camera_support(self):
+        if self._camera_preview_window:
+            return
+        try:
+            camera = initialize_camera()
+            self.display_model.update_camera_status(get_camera_status())
+            self.display_model.set_camera_preview_visible(False)
+            window = CameraPreviewWindow(
+                fps_provider=lambda: getattr(camera, "fps", 30),
+                visibility_callback=self._on_preview_visibility_changed,
+            )
+            self._camera_preview_window = window
+        except Exception as exc:
+            self.logger.error(
+                "Failed to initialize camera preview: %s", exc, exc_info=True
+            )
+            self.display_model.update_camera_status(f"摄像头: 初始化失败({exc})")
+
+    def _on_preview_visibility_changed(self, visible: bool):
+        self.display_model.set_camera_preview_visible(visible)
+
+    def _refresh_camera_status(self):
+        try:
+            status = get_camera_status()
+            self.display_model.update_camera_status(status)
+        except Exception as exc:
+            self.display_model.update_camera_status(f"摄像头: 状态未知({exc})")
+
+    def _start_camera_status_timer(self):
+        if not self.root:
+            return
+        if self._camera_status_timer:
+            self._camera_status_timer.stop()
+        self._camera_status_timer = QTimer(self.root)
+        self._camera_status_timer.setInterval(1000)
+        self._camera_status_timer.timeout.connect(self._refresh_camera_status)
+        self._camera_status_timer.start()
 
     def _dispatch_callback(self, callback_name: str, *args):
         """
