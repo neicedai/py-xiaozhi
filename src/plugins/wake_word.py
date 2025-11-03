@@ -2,6 +2,7 @@ from typing import Any
 
 from src.constants.constants import AbortReason
 from src.plugins.base import Plugin
+from src.utils.common_utils import play_audio_nonblocking
 
 
 class WakeWordPlugin(Plugin):
@@ -67,6 +68,10 @@ class WakeWordPlugin(Plugin):
                     if audio_plugin:
                         await audio_plugin.codec.clear_audio_queue()
                 else:
+                    try:
+                        play_audio_nonblocking("小智在，请讲。")
+                    except Exception:
+                        pass
                     await self.app.start_auto_conversation()
         except Exception:
             pass

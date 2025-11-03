@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import threading
 import time
@@ -7,6 +8,7 @@ import pyaudio
 import webrtcvad
 
 from src.constants.constants import AbortReason, DeviceState
+from src.utils.common_utils import play_audio_nonblocking
 
 # 配置日志
 logger = logging.getLogger("VADDetector")
@@ -292,7 +294,22 @@ class VADDetector:
         """
         触发打断.
         """
-        # 通知应用程序中止当前语音输出
-        self.app.schedule(
-            lambda: self.app.abort_speaking(AbortReason.WAKE_WORD_DETECTED)
-        )
+        try:
+            play_audio_nonblocking("好的，已为您停止播报。")
+        except Exception as e:
+            logger.debug(f"播放停止提示语失败: {e}")
+
+        if not self.loop or self.loop.is_closed():
+            logger.warning("主事件循环不可用，无法调度语音打断")
+            return
+
+        async def _abort_current_speech():
+            try:
+                await self.app.abort_speaking(AbortReason.USER_INTERRUPTION)
+            except Exception as err:
+                logger.error(f"语音打断失败: {err}")
+
+        try:
+            asyncio.run_coroutine_threadsafe(_abort_current_speech(), self.loop)
+        except Exception as err:
+            logger.error(f"调度语音打断协程失败: {err}")
