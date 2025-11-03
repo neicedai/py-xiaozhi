@@ -101,11 +101,16 @@ class Application:
             from src.plugins.audio import AudioPlugin
 
             # 注册音频、UI、MCP、IoT、唤醒词、快捷键与日程插件（UI模式从run参数传入）
+            from src.plugins.wake_response_recorder import (
+                WakeResponseRecorderPlugin,
+            )
+
             self.plugins.register(
                 McpPlugin(),
                 IoTPlugin(),
                 AudioPlugin(),
                 WakeWordPlugin(),
+                WakeResponseRecorderPlugin(),
                 CalendarPlugin(),
                 CameraControlPlugin(),
                 UIPlugin(mode=mode),
