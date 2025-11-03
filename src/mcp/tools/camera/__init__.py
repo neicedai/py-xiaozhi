@@ -2,6 +2,8 @@
 Camera tool for MCP.
 """
 
+from typing import Optional
+
 from src.utils.config_manager import ConfigManager
 from src.utils.logging_config import get_logger
 
@@ -12,6 +14,7 @@ logger = get_logger(__name__)
 
 
 _camera_initialized = False
+_camera_selection_logged: Optional[str] = None
 
 
 def get_camera_instance():
@@ -24,11 +27,17 @@ def get_camera_instance():
     vl_key = config.get_config("CAMERA.VLapi_key")
     vl_url = config.get_config("CAMERA.Local_VL_url")
 
+    global _camera_selection_logged
+
     if vl_key and vl_url:
-        logger.info(f"Initializing VL Camera with URL: {vl_url}")
+        if _camera_selection_logged != "vl":
+            logger.info(f"Initializing VL Camera with URL: {vl_url}")
+            _camera_selection_logged = "vl"
         return VLCamera.get_instance()
 
-    logger.info("VL configuration not found, using normal Camera implementation")
+    if _camera_selection_logged != "normal":
+        logger.info("VL configuration not found, using normal Camera implementation")
+        _camera_selection_logged = "normal"
     return NormalCamera.get_instance()
 
 
