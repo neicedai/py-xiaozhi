@@ -48,20 +48,36 @@ class WakeResponseRecorderPlugin(Plugin):
         if not isinstance(message, dict):
             return
 
-        if str(message.get("type")).lower() != "stt":
+        msg_type = str(message.get("type") or "").lower()
+        if msg_type not in {"stt", "tts"}:
             return
 
-        text = str(message.get("text") or "").strip()
+        text = self._normalize_phrase(message.get("text"))
         if not text:
             return
 
         if text != self._TARGET_PHRASE:
             return
 
-        if not self._is_final_update(message):
+        if msg_type == "stt" and not self._is_final_update(message):
+            return
+
+        # TTS 消息通常在 state == "stop" 时不携带文本，此时无需记录
+        state = str(message.get("state") or "").lower()
+        if msg_type == "tts" and state == "stop":
             return
 
         await self._persist_phrase(text)
+
+    def _normalize_phrase(self, text: Any) -> str:
+        raw = str(text or "").strip()
+        if not raw:
+            return ""
+
+        # 去掉常见的标点符号，避免 “我在。” 无法匹配
+        punctuation = "，,。.!！?？\n\r"
+        table = str.maketrans("", "", punctuation)
+        return raw.translate(table).strip()
 
     def _is_final_update(self, message: dict) -> bool:
         state = str(message.get("state") or "").lower()
