@@ -20,6 +20,7 @@ class GuiDisplayModel(QObject):
     autoModeChanged = pyqtSignal()
     cameraStatusChanged = pyqtSignal()
     cameraPreviewVisibleChanged = pyqtSignal()
+    cameraEnabledChanged = pyqtSignal()
 
     # 用户操作信号
     manualButtonPressed = pyqtSignal()
@@ -43,6 +44,7 @@ class GuiDisplayModel(QObject):
         self._is_connected = False
         self._camera_status = "摄像头: 未初始化"
         self._camera_preview_visible = False
+        self._camera_enabled = False
 
     # 状态文本属性
     @pyqtProperty(str, notify=statusTextChanged)
@@ -178,3 +180,16 @@ class GuiDisplayModel(QObject):
 
     def set_camera_preview_visible(self, visible: bool):
         self.cameraPreviewVisible = visible
+
+    @pyqtProperty(bool, notify=cameraEnabledChanged)
+    def cameraEnabled(self):
+        return self._camera_enabled
+
+    @cameraEnabled.setter
+    def cameraEnabled(self, value: bool):
+        if self._camera_enabled != value:
+            self._camera_enabled = value
+            self.cameraEnabledChanged.emit()
+
+    def set_camera_enabled(self, enabled: bool):
+        self.cameraEnabled = enabled

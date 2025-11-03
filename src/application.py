@@ -14,6 +14,7 @@ except Exception:
 
 from src.constants.constants import DeviceState, ListeningMode
 from src.plugins.calendar import CalendarPlugin
+from src.plugins.camera_control import CameraControlPlugin
 from src.plugins.iot import IoTPlugin
 from src.plugins.manager import PluginManager
 from src.plugins.mcp import McpPlugin
@@ -106,6 +107,7 @@ class Application:
                 AudioPlugin(),
                 WakeWordPlugin(),
                 CalendarPlugin(),
+                CameraControlPlugin(),
                 UIPlugin(mode=mode),
                 ShortcutsPlugin(),
             )

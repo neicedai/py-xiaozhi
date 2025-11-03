@@ -26,8 +26,6 @@ class NormalCamera(BaseCamera):
         super().__init__()
         self.explain_url = ""
         self.explain_token = ""
-        # 在初始化阶段打开摄像头，保持持续连接
-        self.initialize_capture(force_open=True)
 
     @classmethod
     def get_instance(cls):
