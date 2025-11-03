@@ -52,7 +52,16 @@ class WakeResponseRecorderPlugin(Plugin):
         if msg_type not in {"stt", "tts"}:
             return
 
-        text = self._normalize_phrase(message.get("text"))
+        raw_text = message.get("text")
+
+        # 许多 TTS 集成仅在 stop 事件上提供最终文本，此时不能直接忽略
+        # state == "stop" 的消息。我们只在 stop 消息且确无文本时才跳过。
+        if msg_type == "tts":
+            state = str(message.get("state") or "").lower()
+            if state == "stop" and not str(raw_text or "").strip():
+                return
+
+        text = self._normalize_phrase(raw_text)
         if not text:
             return
 
@@ -60,11 +69,6 @@ class WakeResponseRecorderPlugin(Plugin):
             return
 
         if msg_type == "stt" and not self._is_final_update(message):
-            return
-
-        # TTS 消息通常在 state == "stop" 时不携带文本，此时无需记录
-        state = str(message.get("state") or "").lower()
-        if msg_type == "tts" and state == "stop":
             return
 
         await self._persist_phrase(text)
