@@ -45,6 +45,7 @@ class WakeWordDetector:
         # Sherpa-ONNX KWS组件
         self.keyword_spotter = None
         self.stream = None
+        self.active_preset = None
 
         # 初始化配置
         self._load_config(config)
@@ -72,21 +73,75 @@ class WakeWordDetector:
         )  # 增加线程数
         self.provider = config.get_config("WAKE_WORD_OPTIONS.PROVIDER", "cpu")
         self.max_active_paths = config.get_config(
-            "WAKE_WORD_OPTIONS.MAX_ACTIVE_PATHS", 2
-        )  # 减少搜索路径
+            "WAKE_WORD_OPTIONS.MAX_ACTIVE_PATHS", 3
+        )  # 默认兼顾精度的搜索路径
         self.keywords_score = config.get_config(
-            "WAKE_WORD_OPTIONS.KEYWORDS_SCORE", 1.8
-        )  # 降低分数提升速度
+            "WAKE_WORD_OPTIONS.KEYWORDS_SCORE", 2.0
+        )  # 默认增强分数
         self.keywords_threshold = config.get_config(
-            "WAKE_WORD_OPTIONS.KEYWORDS_THRESHOLD", 0.2
-        )  # 降低阈值提高灵敏度
+            "WAKE_WORD_OPTIONS.KEYWORDS_THRESHOLD", 0.25
+        )  # 默认检测阈值
         self.num_trailing_blanks = config.get_config(
             "WAKE_WORD_OPTIONS.NUM_TRAILING_BLANKS", 1
         )
 
+        self._apply_preset(config)
+
         logger.info(
             f"KWS配置加载完成 - 阈值: {self.keywords_threshold}, 分数: {self.keywords_score}"
         )
+
+    def _apply_preset(self, config):
+        """根据配置文件中定义的预设覆盖参数."""
+
+        try:
+            preset_name = config.get_config("WAKE_WORD_OPTIONS.ACTIVE_PRESET")
+            presets = config.get_config("WAKE_WORD_OPTIONS.PRESETS", {})
+
+            if not preset_name or not isinstance(presets, dict):
+                return
+
+            preset_key = None
+            preset_config = None
+
+            if preset_name in presets:
+                preset_key = preset_name
+                preset_config = presets[preset_name]
+            else:
+                lower_map = {k.lower(): (k, v) for k, v in presets.items()}
+                lookup = lower_map.get(str(preset_name).lower())
+                if lookup:
+                    preset_key, preset_config = lookup
+
+            if not isinstance(preset_config, dict):
+                logger.warning(
+                    "未找到唤醒词预设 %s ，将使用自定义参数", preset_name
+                )
+                return
+
+            mapping = {
+                "NUM_THREADS": "num_threads",
+                "MAX_ACTIVE_PATHS": "max_active_paths",
+                "KEYWORDS_SCORE": "keywords_score",
+                "KEYWORDS_THRESHOLD": "keywords_threshold",
+                "NUM_TRAILING_BLANKS": "num_trailing_blanks",
+            }
+
+            for key, attr in mapping.items():
+                if key in preset_config:
+                    setattr(self, attr, preset_config[key])
+
+            self.active_preset = preset_key
+
+            preset_label = preset_config.get("label", preset_key)
+            logger.info(
+                "应用唤醒词预设: %s (%s)", preset_label, preset_key
+            )
+            if description := preset_config.get("description"):
+                logger.debug("预设说明: %s", description)
+
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"应用唤醒词预设失败: {exc}", exc_info=True)
 
     def _init_kws_model(self):
         """
@@ -349,6 +404,7 @@ class WakeWordDetector:
             "num_threads": self.num_threads,
             "keywords_threshold": self.keywords_threshold,
             "keywords_score": self.keywords_score,
+            "active_preset": self.active_preset,
             "is_running": self.is_running(),
         }
 
