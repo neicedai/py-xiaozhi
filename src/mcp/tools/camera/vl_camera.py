@@ -11,6 +11,8 @@ from src.utils.config_manager import ConfigManager
 from src.utils.logging_config import get_logger
 
 from .base_camera import BaseCamera
+from .image_enhancement import enhance_frame_brightness
+from .capture_utils import read_frame_with_warmup
 
 logger = get_logger(__name__)
 
@@ -71,13 +73,16 @@ class VLCamera(BaseCamera):
             cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.frame_width)
             cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.frame_height)
 
-            # 读取图像
-            ret, frame = cap.read()
+            # 读取图像，跳过摄像头初始曝光不足的帧
+            ret, frame = read_frame_with_warmup(cap)
             cap.release()
 
             if not ret:
                 logger.error("Failed to capture image")
                 return False
+
+            # 提升画面亮度，增强低光场景的清晰度
+            frame = enhance_frame_brightness(frame)
 
             # 获取原始图像尺寸
             height, width = frame.shape[:2]
