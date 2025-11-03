@@ -19,7 +19,9 @@ from src.display.gui_display_model import GuiDisplayModel
 from src.mcp.tools.camera import (
     get_camera_status,
     initialize_camera,
+    is_camera_active,
     read_camera_preview_frame,
+    shutdown_camera,
 )
 from src.mcp.tools.camera.image_enhancement import enhance_frame_brightness
 from src.utils.resource_finder import find_assets_dir
@@ -487,6 +489,11 @@ class GuiDisplay(BaseDisplay, QObject, metaclass=CombinedMeta):
         except AttributeError:
             self.logger.debug("摄像头预览信号未定义")
 
+        try:
+            root_object.cameraPowerToggled.connect(self._on_camera_power_toggled)
+        except AttributeError:
+            self.logger.debug("摄像头开关信号未定义")
+
         self.logger.debug("QML 信号连接设置完成")
 
     # =========================================================================
@@ -531,6 +538,11 @@ class GuiDisplay(BaseDisplay, QObject, metaclass=CombinedMeta):
 
     def _on_camera_preview_toggled(self, visible: bool):
         if visible:
+            if not self.display_model.cameraEnabled:
+                self._on_camera_power_toggled(True)
+                if not self.display_model.cameraEnabled:
+                    self.display_model.set_camera_preview_visible(False)
+                    return
             if not self._camera_preview_window:
                 self._initialize_camera_support()
             if self._camera_preview_window:
@@ -540,6 +552,29 @@ class GuiDisplay(BaseDisplay, QObject, metaclass=CombinedMeta):
             if self._camera_preview_window:
                 self._camera_preview_window.hide_preview()
             self.display_model.set_camera_preview_visible(False)
+
+    def _on_camera_power_toggled(self, enabled: bool):
+        if enabled:
+            try:
+                initialize_camera(force_reopen=True)
+                self.display_model.set_camera_enabled(True)
+                self.display_model.update_camera_status(get_camera_status())
+            except Exception as exc:
+                self.logger.error("Failed to open camera: %s", exc, exc_info=True)
+                self.display_model.set_camera_enabled(False)
+                self.display_model.update_camera_status(
+                    f"摄像头: 打开失败({exc})"
+                )
+        else:
+            try:
+                shutdown_camera()
+            except Exception as exc:
+                self.logger.error("Failed to shutdown camera: %s", exc, exc_info=True)
+            if self._camera_preview_window:
+                self._camera_preview_window.hide_preview()
+            self.display_model.set_camera_preview_visible(False)
+            self.display_model.set_camera_enabled(False)
+            self.display_model.update_camera_status(get_camera_status())
 
     def _on_send_button_click(self, text: str):
         """
@@ -579,6 +614,7 @@ class GuiDisplay(BaseDisplay, QObject, metaclass=CombinedMeta):
         try:
             camera = initialize_camera()
             self.display_model.update_camera_status(get_camera_status())
+            self.display_model.set_camera_enabled(is_camera_active())
             self.display_model.set_camera_preview_visible(False)
             window = CameraPreviewWindow(
                 fps_provider=lambda: getattr(camera, "fps", 30),
@@ -598,6 +634,10 @@ class GuiDisplay(BaseDisplay, QObject, metaclass=CombinedMeta):
         try:
             status = get_camera_status()
             self.display_model.update_camera_status(status)
+            active = is_camera_active()
+            self.display_model.set_camera_enabled(active)
+            if not active and self._camera_preview_window:
+                self._camera_preview_window.hide_preview()
         except Exception as exc:
             self.display_model.update_camera_status(f"摄像头: 状态未知({exc})")
 
@@ -610,6 +650,7 @@ class GuiDisplay(BaseDisplay, QObject, metaclass=CombinedMeta):
         self._camera_status_timer.setInterval(1000)
         self._camera_status_timer.timeout.connect(self._refresh_camera_status)
         self._camera_status_timer.start()
+        self._refresh_camera_status()
 
     def _dispatch_callback(self, callback_name: str, *args):
         """

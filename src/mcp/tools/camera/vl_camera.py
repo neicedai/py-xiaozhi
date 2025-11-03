@@ -40,7 +40,6 @@ class VLCamera(BaseCamera):
         )
         self.model = config.get_config("CAMERA.models", "glm-4v-plus")
         logger.info(f"VL Camera initialized with model: {self.model}")
-        self.initialize_capture(force_open=True)
 
     @classmethod
     def get_instance(cls):

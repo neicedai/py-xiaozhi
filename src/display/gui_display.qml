@@ -24,6 +24,7 @@ Rectangle {
     signal titleDragMoveTo(real mouseX, real mouseY)
     signal titleDragEnd()
     signal cameraPreviewToggled(bool visible)
+    signal cameraPowerToggled(bool enabled)
 
     // 主布局
     ColumnLayout {
@@ -130,29 +131,56 @@ Rectangle {
                 }
 
                 // 摄像头状态与预览开关
-                RowLayout {
+                ColumnLayout {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 36
-                    spacing: 12
+                    spacing: 6
 
-                    Text {
+                    RowLayout {
                         Layout.fillWidth: true
-                        text: displayModel ? displayModel.cameraStatus : "摄像头: 未初始化"
-                        font.pixelSize: 12
-                        color: "#4e5969"
-                        verticalAlignment: Text.AlignVCenter
-                        elide: Text.ElideRight
+                        Layout.preferredHeight: 36
+                        spacing: 12
+
+                        Text {
+                            Layout.fillWidth: true
+                            text: displayModel ? displayModel.cameraStatus : "摄像头: 未初始化"
+                            font.pixelSize: 12
+                            color: "#4e5969"
+                            verticalAlignment: Text.AlignVCenter
+                            elide: Text.ElideRight
+                        }
+
+                        Switch {
+                            id: cameraPowerSwitch
+                            text: checked ? "关闭摄像头" : "开启摄像头"
+                            onToggled: root.cameraPowerToggled(checked)
+
+                            Binding {
+                                target: cameraPowerSwitch
+                                property: "checked"
+                                value: displayModel ? displayModel.cameraEnabled : false
+                            }
+                        }
                     }
 
-                    Switch {
-                        id: cameraPreviewSwitch
-                        text: checked ? "隐藏预览" : "显示预览"
-                        onToggled: root.cameraPreviewToggled(checked)
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 36
+                        spacing: 12
 
-                        Binding {
-                            target: cameraPreviewSwitch
-                            property: "checked"
-                            value: displayModel ? displayModel.cameraPreviewVisible : false
+                        Item { Layout.fillWidth: true }
+
+                        Switch {
+                            id: cameraPreviewSwitch
+                            text: checked ? "隐藏预览" : "显示预览"
+                            enabled: cameraPowerSwitch.checked
+                            opacity: enabled ? 1.0 : 0.5
+                            onToggled: root.cameraPreviewToggled(checked)
+
+                            Binding {
+                                target: cameraPreviewSwitch
+                                property: "checked"
+                                value: displayModel ? displayModel.cameraPreviewVisible : false
+                            }
                         }
                     }
                 }

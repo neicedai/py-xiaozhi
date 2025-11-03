@@ -67,6 +67,24 @@ def read_camera_preview_frame():
     return camera.read_preview_frame()
 
 
+def shutdown_camera():
+    """Release the camera device and reset initialization flag."""
+
+    global _camera_initialized
+    camera = get_camera_instance()
+    camera.release()
+    _camera_initialized = False
+
+
+def is_camera_active() -> bool:
+    """Return True when the camera capture device is active."""
+
+    try:
+        return get_camera_instance().is_active()
+    except Exception:
+        return False
+
+
 def take_photo(arguments: dict) -> str:
     """
     拍照并分析的工具函数.

@@ -142,10 +142,18 @@ class BaseCamera(ABC):
                 except Exception:
                     pass
                 self._cap = None
+        self._active_camera_index = None
+        self._active_frame_width = None
+        self._active_frame_height = None
+        self._active_fps = None
         self._status = "摄像头: 已关闭"
 
     def get_status(self) -> str:
         return self._status
+
+    def is_active(self) -> bool:
+        with self._cap_lock:
+            return bool(self._cap and self._cap.isOpened())
 
     # ------------------------------------------------------------------
     # 子类接口
