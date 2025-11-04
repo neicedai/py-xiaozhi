@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>小智 AI Web 控制台</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="page">
+      <header class="hero">
+        <div>
+          <h1>小智 AI Web 控制台</h1>
+          <p>通过浏览器启动、停止并监控 main.py 的全部功能</p>
+        </div>
+        <div class="status-pill" id="status-pill">待机</div>
+      </header>
+
+      <section class="card">
+        <h2>运行配置</h2>
+        <form id="control-form" class="form-grid">
+          <label for="mode">运行模式</label>
+          <select id="mode" name="mode">
+            <option value="gui">GUI（桌面界面）</option>
+            <option value="cli" selected>CLI（命令行）</option>
+          </select>
+
+          <label for="protocol">通信协议</label>
+          <select id="protocol" name="protocol">
+            <option value="websocket" selected>WebSocket</option>
+            <option value="mqtt">MQTT</option>
+          </select>
+
+          <label for="skipActivation">跳过激活流程</label>
+          <div class="checkbox-wrapper">
+            <input type="checkbox" id="skipActivation" name="skipActivation" />
+            <span>仅用于调试</span>
+          </div>
+
+          <div class="button-row">
+            <button type="submit" id="start-btn" class="primary">启动应用</button>
+            <button type="button" id="stop-btn" class="danger">停止应用</button>
+            <button type="button" id="clear-log-btn" class="ghost">清空日志</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="card">
+        <h2>运行状态</h2>
+        <div class="status-grid">
+          <div>
+            <span class="label">状态</span>
+            <span id="status-text" class="value">待机</span>
+          </div>
+          <div>
+            <span class="label">当前模式</span>
+            <span id="status-mode" class="value">-</span>
+          </div>
+          <div>
+            <span class="label">通信协议</span>
+            <span id="status-protocol" class="value">-</span>
+          </div>
+          <div>
+            <span class="label">跳过激活</span>
+            <span id="status-skip" class="value">-</span>
+          </div>
+          <div>
+            <span class="label">进程 PID</span>
+            <span id="status-pid" class="value">-</span>
+          </div>
+          <div>
+            <span class="label">退出码</span>
+            <span id="status-exit" class="value">-</span>
+          </div>
+        </div>
+        <p id="status-message" class="status-message">服务尚未启动</p>
+      </section>
+
+      <section class="card logs">
+        <div class="logs-header">
+          <h2>实时日志</h2>
+          <span id="log-count" class="log-count">0 条</span>
+        </div>
+        <pre id="log-view" class="log-view">等待日志...</pre>
+      </section>
+    </div>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script src="/static/app.js" defer></script>
+  </body>
+</html>
