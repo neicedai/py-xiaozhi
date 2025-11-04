@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>本地摄像头与麦克风测试</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+      }
+
+      body {
+        font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont,
+          "Helvetica Neue", Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+        background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+        color: #f8fafc;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      header {
+        width: min(960px, 90vw);
+        text-align: center;
+        margin: 3rem 0 2rem;
+      }
+
+      main {
+        width: min(960px, 90vw);
+        background: rgba(15, 23, 42, 0.72);
+        border: 1px solid rgba(148, 163, 184, 0.3);
+        border-radius: 24px;
+        box-shadow: 0 40px 120px rgba(15, 23, 42, 0.4);
+        padding: 2.5rem 2rem 3rem;
+        backdrop-filter: blur(24px);
+      }
+
+      h1 {
+        font-size: clamp(2rem, 2.4rem, 3rem);
+        margin-bottom: 0.5rem;
+      }
+
+      p.description {
+        font-size: 1rem;
+        color: rgba(226, 232, 240, 0.85);
+        line-height: 1.6;
+      }
+
+      section + section {
+        margin-top: 2.5rem;
+      }
+
+      .controls {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+        margin-top: 1.5rem;
+      }
+
+      button {
+        border: none;
+        border-radius: 999px;
+        padding: 0.75rem 1.8rem;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: transform 0.18s ease, box-shadow 0.18s ease;
+      }
+
+      button.primary {
+        background: linear-gradient(135deg, #38bdf8 0%, #6366f1 100%);
+        color: #0f172a;
+        box-shadow: 0 14px 40px rgba(14, 165, 233, 0.35);
+      }
+
+      button.secondary {
+        background: rgba(148, 163, 184, 0.16);
+        color: #e2e8f0;
+        border: 1px solid rgba(148, 163, 184, 0.4);
+      }
+
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+      }
+
+      button:not(:disabled):hover {
+        transform: translateY(-1px) scale(1.01);
+        box-shadow: 0 16px 32px rgba(14, 165, 233, 0.2);
+      }
+
+      .video-wrapper {
+        position: relative;
+        overflow: hidden;
+        border-radius: 20px;
+        border: 1px solid rgba(148, 163, 184, 0.35);
+        background: rgba(15, 23, 42, 0.6);
+        aspect-ratio: 16 / 9;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      .placeholder {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1rem;
+        color: rgba(148, 163, 184, 0.9);
+      }
+
+      .placeholder svg {
+        width: 72px;
+        height: 72px;
+      }
+
+      .status-list {
+        list-style: none;
+        padding: 0;
+        margin: 1.5rem 0 0;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1.2rem;
+      }
+
+      .status-item {
+        background: rgba(15, 23, 42, 0.7);
+        border-radius: 18px;
+        border: 1px solid rgba(148, 163, 184, 0.28);
+        padding: 1.2rem 1.4rem;
+        min-height: 120px;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+
+      .status-item h3 {
+        margin: 0;
+        font-size: 1rem;
+        font-weight: 600;
+        color: #bae6fd;
+      }
+
+      .status-item span {
+        font-size: 0.95rem;
+        color: rgba(226, 232, 240, 0.85);
+      }
+
+      .meter {
+        position: relative;
+        width: 100%;
+        height: 12px;
+        border-radius: 999px;
+        background: rgba(71, 85, 105, 0.6);
+        overflow: hidden;
+        margin-top: 0.6rem;
+      }
+
+      .meter-fill {
+        position: absolute;
+        inset: 0;
+        width: 0%;
+        background: linear-gradient(90deg, #34d399 0%, #facc15 60%, #f97316 100%);
+        transition: width 0.1s ease-out;
+      }
+
+      .log {
+        background: rgba(15, 23, 42, 0.7);
+        border: 1px solid rgba(148, 163, 184, 0.28);
+        border-radius: 16px;
+        padding: 1.2rem;
+        margin-top: 1.5rem;
+        font-size: 0.95rem;
+        line-height: 1.6;
+        color: rgba(203, 213, 225, 0.9);
+        white-space: pre-wrap;
+      }
+
+      @media (max-width: 640px) {
+        main {
+          padding: 2rem 1.25rem 2.5rem;
+        }
+
+        .controls {
+          flex-direction: column;
+        }
+
+        button {
+          width: 100%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>本地摄像头与麦克风测试</h1>
+      <p class="description">
+        点击“开始测试”后请允许浏览器访问摄像头与麦克风。视频画面、音量指示条与设备信息会实时显示，帮助你快速验证设备是否工作正常。
+      </p>
+    </header>
+    <main>
+      <section>
+        <div class="video-wrapper">
+          <video id="video" autoplay playsinline muted></video>
+          <div id="placeholder" class="placeholder">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4">
+              <path
+                d="M4 7a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v1M4 7v10a2 2 0 0 0 2 2h12"
+              />
+              <path
+                d="M14 18v-3h4v1a2 2 0 0 0 2 2h0M3 3l18 18"
+                stroke-linecap="round"
+              />
+            </svg>
+            <span>摄像头画面将在这里显示</span>
+          </div>
+        </div>
+        <div class="controls">
+          <button id="startBtn" class="primary">开始测试</button>
+          <button id="stopBtn" class="secondary" disabled>停止并释放设备</button>
+        </div>
+      </section>
+
+      <section>
+        <ul class="status-list">
+          <li class="status-item">
+            <h3>摄像头状态</h3>
+            <span id="cameraStatus">未开始</span>
+          </li>
+          <li class="status-item">
+            <h3>麦克风状态</h3>
+            <span id="microphoneStatus">未开始</span>
+            <div class="meter">
+              <div id="audioLevel" class="meter-fill"></div>
+            </div>
+          </li>
+          <li class="status-item">
+            <h3>已使用的设备</h3>
+            <span id="deviceInfo">等待授权...</span>
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <div class="status-item log">
+          <strong>提示</strong>
+          <div id="log">1. 点击开始后根据浏览器提示授予权限。
+2. 如果多次拒绝，需要在浏览器地址栏重新允许访问。
+3. 如需切换到其它设备，请先停止测试再重新开始。
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      const videoEl = document.getElementById("video");
+      const placeholderEl = document.getElementById("placeholder");
+      const startBtn = document.getElementById("startBtn");
+      const stopBtn = document.getElementById("stopBtn");
+      const cameraStatusEl = document.getElementById("cameraStatus");
+      const micStatusEl = document.getElementById("microphoneStatus");
+      const deviceInfoEl = document.getElementById("deviceInfo");
+      const audioLevelEl = document.getElementById("audioLevel");
+      const logEl = document.getElementById("log");
+
+      let currentStream = null;
+      let audioContext = null;
+      let audioAnalyser = null;
+      let animationFrame = null;
+
+      async function startTest() {
+        if (!navigator.mediaDevices?.getUserMedia) {
+          appendLog("当前浏览器不支持 getUserMedia API，请更换现代浏览器。");
+          return;
+        }
+
+        try {
+          startBtn.disabled = true;
+          stopBtn.disabled = false;
+          appendLog("请求摄像头和麦克风权限...");
+
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: { width: { ideal: 1280 }, height: { ideal: 720 } },
+            audio: { echoCancellation: true, noiseSuppression: true },
+          });
+
+          handleStream(stream);
+          appendLog("设备已成功连接。");
+        } catch (error) {
+          startBtn.disabled = false;
+          stopBtn.disabled = true;
+          handleError(error);
+        }
+      }
+
+      function handleStream(stream) {
+        stopCurrentStream();
+        currentStream = stream;
+
+        placeholderEl.style.display = "none";
+        videoEl.srcObject = stream;
+        videoEl.muted = true;
+        videoEl.play().catch(() => {
+          appendLog("浏览器阻止了自动播放，请手动点击视频开始。");
+        });
+
+        const videoTracks = stream.getVideoTracks();
+        const audioTracks = stream.getAudioTracks();
+
+        if (videoTracks.length) {
+          cameraStatusEl.textContent = `已连接：${videoTracks[0].label || "摄像头"}`;
+        } else {
+          cameraStatusEl.textContent = "未检测到摄像头";
+        }
+
+        if (audioTracks.length) {
+          micStatusEl.textContent = `已连接：${audioTracks[0].label || "麦克风"}`;
+        } else {
+          micStatusEl.textContent = "未检测到麦克风";
+        }
+
+        deviceInfoEl.textContent = [
+          ...videoTracks.map((track) => `🎥 ${track.label || "摄像头"}`),
+          ...audioTracks.map((track) => `🎙️ ${track.label || "麦克风"}`),
+        ].join("\n") || "未检测到任何媒体轨道";
+
+        setupAudioAnalyser(stream);
+      }
+
+      function setupAudioAnalyser(stream) {
+        stopAudioAnalyser();
+
+        try {
+          audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          const source = audioContext.createMediaStreamSource(stream);
+          audioAnalyser = audioContext.createAnalyser();
+          audioAnalyser.fftSize = 256;
+          source.connect(audioAnalyser);
+          renderAudioLevel();
+        } catch (error) {
+          micStatusEl.textContent = "无法创建音频上下文";
+          appendLog(`音频分析器初始化失败：${error.message}`);
+        }
+      }
+
+      function renderAudioLevel() {
+        if (!audioAnalyser) return;
+        const dataArray = new Uint8Array(audioAnalyser.frequencyBinCount);
+
+        const draw = () => {
+          audioAnalyser.getByteFrequencyData(dataArray);
+          const max = Math.max(...dataArray);
+          const level = Math.min(100, Math.round((max / 255) * 100));
+          audioLevelEl.style.width = `${level}%`;
+          animationFrame = requestAnimationFrame(draw);
+        };
+
+        draw();
+      }
+
+      function stopAudioAnalyser() {
+        if (animationFrame) {
+          cancelAnimationFrame(animationFrame);
+          animationFrame = null;
+        }
+        if (audioContext) {
+          audioContext.close();
+          audioContext = null;
+        }
+        audioAnalyser = null;
+        audioLevelEl.style.width = "0%";
+      }
+
+      function stopCurrentStream() {
+        if (!currentStream) return;
+        currentStream.getTracks().forEach((track) => track.stop());
+        currentStream = null;
+      }
+
+      function stopTest() {
+        stopCurrentStream();
+        stopAudioAnalyser();
+        videoEl.srcObject = null;
+        placeholderEl.style.display = "flex";
+        cameraStatusEl.textContent = "已停止";
+        micStatusEl.textContent = "已停止";
+        deviceInfoEl.textContent = "已释放设备资源";
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
+        appendLog("已停止测试并释放设备。");
+      }
+
+      function handleError(error) {
+        let message = "无法访问设备";
+
+        if (error.name === "NotAllowedError") {
+          message = "已拒绝访问权限，请在浏览器地址栏重新允许摄像头/麦克风访问。";
+        } else if (error.name === "NotFoundError") {
+          message = "未检测到可用的摄像头或麦克风。";
+        } else if (error.name === "NotReadableError") {
+          message = "设备被其他应用占用，请关闭后重试。";
+        } else if (error.name === "OverconstrainedError") {
+          message = "找不到符合要求的设备，请调整分辨率或选择其他设备。";
+        } else if (error.message) {
+          message = error.message;
+        }
+
+        appendLog(message);
+        cameraStatusEl.textContent = "连接失败";
+        micStatusEl.textContent = "连接失败";
+      }
+
+      function appendLog(text) {
+        const time = new Date().toLocaleTimeString();
+        logEl.textContent = `${time} · ${text}\n${logEl.textContent}`;
+      }
+
+      startBtn.addEventListener("click", startTest);
+      stopBtn.addEventListener("click", stopTest);
+
+      window.addEventListener("beforeunload", stopTest);
+    </script>
+  </body>
+</html>

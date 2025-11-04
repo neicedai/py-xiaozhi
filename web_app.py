@@ -42,6 +42,13 @@ async def index(request: Request) -> HTMLResponse:
     return TEMPLATES.TemplateResponse("index.html", {"request": request})
 
 
+@app.get("/test/devices", response_class=HTMLResponse)
+async def test_devices(request: Request) -> HTMLResponse:
+    """渲染摄像头与麦克风的调试页面。"""
+
+    return TEMPLATES.TemplateResponse("test_av.html", {"request": request})
+
+
 @app.websocket("/ws/audio")
 async def audio_socket(websocket: WebSocket) -> None:
     await web_audio_bridge.handle_client(websocket)
