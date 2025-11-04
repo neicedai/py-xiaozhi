@@ -46,6 +46,11 @@ class UIPlugin(Plugin):
 
             self._is_gui = True
             return GuiDisplay()
+        if self.mode == "web":
+            from src.display.web_display import WebDisplay
+
+            self._is_gui = False
+            return WebDisplay()
         else:
             from src.display.cli_display import CliDisplay
 
