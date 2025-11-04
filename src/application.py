@@ -98,7 +98,14 @@ class Application:
             self._set_protocol(protocol)
             self._setup_protocol_callbacks()
             # 插件：setup（延迟导入AudioPlugin，确保上面setup_opus已执行）
-            from src.plugins.audio import AudioPlugin
+            if mode == "web":
+                from src.plugins.web_audio import WebAudioPlugin
+
+                audio_plugin = WebAudioPlugin()
+            else:
+                from src.plugins.audio import AudioPlugin
+
+                audio_plugin = AudioPlugin()
 
             # 注册音频、UI、MCP、IoT、唤醒词、快捷键与日程插件（UI模式从run参数传入）
             from src.plugins.wake_response_recorder import (
@@ -108,7 +115,7 @@ class Application:
             self.plugins.register(
                 McpPlugin(),
                 IoTPlugin(),
-                AudioPlugin(),
+                audio_plugin,
                 WakeWordPlugin(),
                 WakeResponseRecorderPlugin(),
                 CalendarPlugin(),

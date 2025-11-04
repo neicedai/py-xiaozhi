@@ -4,85 +4,134 @@
     <meta charset="UTF-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>小智 AI Web 控制台</title>
+    <title>小智 AI 浏览器控制台</title>
     <link rel="stylesheet" href="/static/styles.css" />
   </head>
   <body>
-    <div class="page">
+    <div class="page" data-runtime="idle">
       <header class="hero">
         <div>
-          <h1>小智 AI Web 控制台</h1>
-          <p>通过浏览器启动、停止并监控 main.py 的全部功能</p>
+          <h1>小智 AI 浏览器控制台</h1>
+          <p>在浏览器中完整访问语音、唤醒与摄像头能力</p>
         </div>
-        <div class="status-pill" id="status-pill">待机</div>
+        <div class="status-pill" id="runtime-status">初始化中</div>
       </header>
 
-      <section class="card">
-        <h2>运行配置</h2>
-        <form id="control-form" class="form-grid">
-          <label for="mode">运行模式</label>
-          <select id="mode" name="mode">
-            <option value="gui">GUI（桌面界面）</option>
-            <option value="cli" selected>CLI（命令行）</option>
-          </select>
-
-          <label for="protocol">通信协议</label>
-          <select id="protocol" name="protocol">
-            <option value="websocket" selected>WebSocket</option>
-            <option value="mqtt">MQTT</option>
-          </select>
-
-          <label for="skipActivation">跳过激活流程</label>
-          <div class="checkbox-wrapper">
-            <input type="checkbox" id="skipActivation" name="skipActivation" />
-            <span>仅用于调试</span>
+      <section class="card overview">
+        <h2>运行概览</h2>
+        <div class="overview-grid">
+          <div class="overview-item">
+            <span class="label">运行状态</span>
+            <span class="value" id="runtime-message">准备就绪</span>
           </div>
-
-          <div class="button-row">
-            <button type="submit" id="start-btn" class="primary">启动应用</button>
-            <button type="button" id="stop-btn" class="danger">停止应用</button>
-            <button type="button" id="clear-log-btn" class="ghost">清空日志</button>
+          <div class="overview-item">
+            <span class="label">设备状态</span>
+            <span class="value" id="device-state">-</span>
           </div>
-        </form>
-      </section>
-
-      <section class="card">
-        <h2>运行状态</h2>
-        <div class="status-grid">
-          <div>
-            <span class="label">状态</span>
-            <span id="status-text" class="value">待机</span>
+          <div class="overview-item">
+            <span class="label">监听模式</span>
+            <span class="value" id="listening-mode">-</span>
           </div>
-          <div>
-            <span class="label">当前模式</span>
-            <span id="status-mode" class="value">-</span>
+          <div class="overview-item">
+            <span class="label">持续对话</span>
+            <span class="value" id="keep-listening">-</span>
           </div>
-          <div>
-            <span class="label">通信协议</span>
-            <span id="status-protocol" class="value">-</span>
+          <div class="overview-item">
+            <span class="label">音频通道</span>
+            <span class="value" id="audio-opened">-</span>
           </div>
-          <div>
-            <span class="label">跳过激活</span>
-            <span id="status-skip" class="value">-</span>
+          <div class="overview-item">
+            <span class="label">浏览器音频</span>
+            <span class="value" id="web-audio-status" data-state="disconnected">未连接</span>
           </div>
-          <div>
-            <span class="label">进程 PID</span>
-            <span id="status-pid" class="value">-</span>
-          </div>
-          <div>
-            <span class="label">退出码</span>
-            <span id="status-exit" class="value">-</span>
+          <div class="overview-item">
+            <span class="label">当前情绪</span>
+            <span class="value" id="ui-emotion">-</span>
           </div>
         </div>
-        <p id="status-message" class="status-message">服务尚未启动</p>
+      </section>
+
+      <section class="card ui-state">
+        <div class="ui-state-header">
+          <h2>实时交互</h2>
+          <span id="ui-status" class="pill">等待连接...</span>
+        </div>
+        <div class="ui-text" id="ui-text">尚未收到任何对话</div>
+        <div class="ui-button" id="ui-button">按钮状态：-</div>
+      </section>
+
+      <section class="card controls">
+        <h2>语音与唤醒控制</h2>
+        <div class="controls-grid">
+          <div class="control-group">
+            <h3>手动对讲</h3>
+            <div class="button-row">
+              <button type="button" id="manual-start" class="primary">按下说话</button>
+              <button type="button" id="manual-stop" class="ghost">结束说话</button>
+            </div>
+          </div>
+          <div class="control-group">
+            <h3>持续对话</h3>
+            <div class="button-row">
+              <button type="button" id="auto-start" class="primary">开启持续聆听</button>
+              <button type="button" id="auto-stop" class="ghost">停止持续聆听</button>
+              <button type="button" id="abort-speaking" class="danger">打断当前播报</button>
+            </div>
+          </div>
+          <div class="control-group">
+            <h3>文本交互</h3>
+            <div class="text-send">
+              <input
+                type="text"
+                id="text-input"
+                placeholder="输入要发送给小智的文本"
+                autocomplete="off"
+              />
+              <div class="button-row">
+                <button type="button" id="send-text" class="primary">发送文本</button>
+                <button type="button" id="wake-now" class="ghost">模拟唤醒</button>
+                <button type="button" id="clear-text" class="ghost">清空</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card camera">
+        <div class="camera-header">
+          <h2>摄像头控制</h2>
+          <span id="camera-status" class="pill pill-muted">摄像头状态未知</span>
+        </div>
+        <div class="camera-body">
+          <div class="camera-preview">
+            <img id="camera-preview" alt="摄像头预览" />
+            <div class="button-row">
+              <button type="button" id="camera-open" class="primary">开启摄像头</button>
+              <button type="button" id="camera-close" class="ghost">关闭摄像头</button>
+              <button type="button" id="camera-refresh" class="ghost">刷新预览</button>
+              <button type="button" id="camera-status-refresh" class="ghost">刷新状态</button>
+            </div>
+          </div>
+          <div class="camera-actions">
+            <label for="camera-question" class="label">分析问题</label>
+            <textarea id="camera-question" rows="3" placeholder="例如：画面中有什么？"></textarea>
+            <div class="button-row">
+              <button type="button" id="camera-capture" class="primary">拍照并分析</button>
+            </div>
+            <pre id="camera-result" class="camera-result">等待操作...</pre>
+          </div>
+        </div>
       </section>
 
       <section class="card logs">
         <div class="logs-header">
-          <h2>实时日志</h2>
+          <h2>运行日志</h2>
           <span id="log-count" class="log-count">0 条</span>
         </div>
         <pre id="log-view" class="log-view">等待日志...</pre>
+        <div class="button-row">
+          <button type="button" id="clear-log-btn" class="ghost">清空日志</button>
+        </div>
       </section>
     </div>
 
