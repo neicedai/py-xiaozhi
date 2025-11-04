@@ -228,6 +228,20 @@ python main.py --protocol websocket  # WebSocket（默认）
 python main.py --protocol mqtt       # MQTT协议
 ```
 
+### Web 控制台运行
+
+项目新增 Web 控制台，方便在远端浏览器中启动、停止并监控 `main.py` 的运行状态。
+
+```bash
+# 启动 FastAPI Web 服务
+uvicorn web_app:app --host 0.0.0.0 --port 8000 --reload
+
+# 或使用 Python 直接运行（默认监听 8000 端口）
+python web_app.py
+```
+
+访问 `http://<服务器IP>:8000/` 即可打开可视化页面，配置运行模式、通信协议、是否跳过激活流程，并实时查看 `main.py` 子进程输出的日志。
+
 ### 核心开发模式
 
 - **异步优先**: 使用`async/await`语法，避免阻塞操作
