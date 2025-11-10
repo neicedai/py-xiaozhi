@@ -260,6 +260,26 @@ class UIPlugin(Plugin):
                         )
 
                         if not tool:
+                            logger.warning(
+                                "[NewConcept] teach tool missing - attempting MCP tool reload"
+                            )
+                            try:
+                                server.add_common_tools()
+                            except Exception as exc:  # pragma: no cover - defensive
+                                logger.error(
+                                    "[NewConcept] Failed to reload MCP tools: %s", exc,
+                                    exc_info=True,
+                                )
+                            tool = next(
+                                (
+                                    t
+                                    for t in server.tools
+                                    if t.name == "education.new_concept.teach"
+                                ),
+                                None,
+                            )
+
+                        if not tool:
                             message = "[新概念课程] 教学工具尚未注册。"
                         else:
                             tool_response = await tool.call(

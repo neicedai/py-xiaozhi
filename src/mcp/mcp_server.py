@@ -254,36 +254,67 @@ class McpServer:
         original_tools = self.tools.copy()
         self.tools.clear()
 
+        def _safe_init(description: str, func: Callable[[], None]) -> None:
+            try:
+                func()
+            except Exception as exc:  # pragma: no cover - optional tool init
+                logger.error(
+                    "Failed to initialize %s tools: %s", description, exc, exc_info=True
+                )
+
         # 添加系统工具
         from src.mcp.tools.system import get_system_tools_manager
 
         system_manager = get_system_tools_manager()
-        system_manager.init_tools(self.add_tool, PropertyList, Property, PropertyType)
+        _safe_init(
+            "system",
+            lambda: system_manager.init_tools(
+                self.add_tool, PropertyList, Property, PropertyType
+            ),
+        )
 
         # 添加日程管理工具
         from src.mcp.tools.calendar import get_calendar_manager
 
         calendar_manager = get_calendar_manager()
-        calendar_manager.init_tools(self.add_tool, PropertyList, Property, PropertyType)
+        _safe_init(
+            "calendar",
+            lambda: calendar_manager.init_tools(
+                self.add_tool, PropertyList, Property, PropertyType
+            ),
+        )
 
         # 添加倒计时器工具
         from src.mcp.tools.timer import get_timer_manager
 
         timer_manager = get_timer_manager()
-        timer_manager.init_tools(self.add_tool, PropertyList, Property, PropertyType)
+        _safe_init(
+            "timer",
+            lambda: timer_manager.init_tools(
+                self.add_tool, PropertyList, Property, PropertyType
+            ),
+        )
 
         # 添加音乐播放器工具
         from src.mcp.tools.music import get_music_tools_manager
 
         music_manager = get_music_tools_manager()
-        music_manager.init_tools(self.add_tool, PropertyList, Property, PropertyType)
+        _safe_init(
+            "music",
+            lambda: music_manager.init_tools(
+                self.add_tool, PropertyList, Property, PropertyType
+            ),
+        )
 
         # 添加新概念英语课程工具
         from src.mcp.tools.new_concept import get_new_concept_manager
 
         new_concept_manager = get_new_concept_manager()
-        new_concept_manager.init_tools(
-            self.add_tool, PropertyList, Property, PropertyType
+        _safe_init(
+            "new_concept",
+            lambda: new_concept_manager.init_tools(
+                self.add_tool, PropertyList, Property, PropertyType
+            ),
         )
 
         # 添加摄像头工具
