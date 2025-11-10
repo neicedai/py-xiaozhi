@@ -9,7 +9,7 @@ from src.mcp.mcp_server import Property, PropertyList, PropertyType
 from src.utils.logging_config import get_logger
 
 from .data_loader import get_repository
-from .deepseek_client import DeepSeekClient
+from .deepseek_client import DeepSeekClient, get_deepseek_client
 from .prompt_builder import build_prompts
 
 logger = get_logger(__name__)
@@ -20,7 +20,6 @@ class NewConceptToolsManager:
 
     def __init__(self) -> None:
         self._repository = get_repository()
-        self._client: Optional[DeepSeekClient] = None
 
     # ------------------------------------------------------------------
     def init_tools(
@@ -246,9 +245,7 @@ class NewConceptToolsManager:
         return response
 
     def _get_client(self) -> DeepSeekClient:
-        if self._client is None:
-            self._client = DeepSeekClient()
-        return self._client
+        return get_deepseek_client()
 
 
 def get_new_concept_manager() -> NewConceptToolsManager:
