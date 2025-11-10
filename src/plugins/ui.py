@@ -264,7 +264,9 @@ class UIPlugin(Plugin):
                                 "[NewConcept] teach tool missing - attempting MCP tool reload"
                             )
                             try:
-                                server.add_common_tools()
+                                ensured = server.ensure_new_concept_tools()
+                                if not ensured:
+                                    server.add_common_tools()
                             except Exception as exc:  # pragma: no cover - defensive
                                 logger.error(
                                     "[NewConcept] Failed to reload MCP tools: %s", exc,

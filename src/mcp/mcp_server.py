@@ -398,7 +398,51 @@ class McpServer:
         bazi_manager.init_tools(self.add_tool, PropertyList, Property, PropertyType)
 
         # 恢复原有工具
-        self.tools.extend(original_tools)
+        if original_tools:
+            existing_names = {tool.name for tool in self.tools}
+            for tool in original_tools:
+                if tool.name in existing_names:
+                    continue
+                self.tools.append(tool)
+                existing_names.add(tool.name)
+
+    # ------------------------------------------------------------------
+    def ensure_new_concept_tools(self) -> bool:
+        """确保新概念课程工具已注册."""
+
+        required_names = {
+            "education.new_concept.list_lessons",
+            "education.new_concept.generate_prompt",
+            "education.new_concept.teach",
+        }
+
+        if required_names.issubset({tool.name for tool in self.tools}):
+            return True
+
+        try:
+            from src.mcp.tools.new_concept import get_new_concept_manager
+        except Exception as exc:  # pragma: no cover - import guard
+            logger.error(
+                "[NewConcept] Failed to import tool manager during ensure: %s",
+                exc,
+                exc_info=True,
+            )
+            return False
+
+        manager = get_new_concept_manager()
+        try:
+            manager.init_tools(self.add_tool, PropertyList, Property, PropertyType)
+        except Exception as exc:  # pragma: no cover - defensive re-registration
+            logger.error(
+                "[NewConcept] Failed to re-register tools during ensure: %s",
+                exc,
+                exc_info=True,
+            )
+            return False
+
+        return "education.new_concept.teach" in {
+            tool.name for tool in self.tools
+        }
 
     async def parse_message(self, message: Union[str, Dict[str, Any]]):
         """
