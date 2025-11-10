@@ -2,6 +2,9 @@ from typing import Any, Optional
 
 from src.constants.constants import AbortReason, DeviceState
 from src.plugins.base import Plugin
+from src.utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class UIPlugin(Plugin):
@@ -149,6 +152,9 @@ class UIPlugin(Plugin):
         """
         发送文本到服务端.
         """
+        if await self._handle_local_command(text):
+            return
+
         if self.app.device_state == DeviceState.SPEAKING:
             audio_plugin = self.app.plugins.get_plugin("audio")
             if audio_plugin:
@@ -156,6 +162,50 @@ class UIPlugin(Plugin):
             await self.app.abort_speaking(None)
         if await self.app.connect_protocol():
             await self.app.protocol.send_wake_word_detected(text)
+
+    async def _handle_local_command(self, text: str) -> bool:
+        """处理无需经过协议的本地指令."""
+
+        normalized = text.strip().lower()
+        if not normalized:
+            return False
+
+        diagnostics_triggers = {
+            "测试课程库",
+            "课程库测试",
+            "mcp测试",
+            "mcp test",
+            "#mcp-test",
+        }
+        if normalized in diagnostics_triggers:
+            await self._run_new_concept_diagnostics()
+            return True
+
+        return False
+
+    async def _run_new_concept_diagnostics(self) -> None:
+        """运行新概念课程库的快速诊断，并在界面显示结果."""
+
+        try:
+            from src.mcp.tools.new_concept.data_loader import LessonRepository
+
+            repository = LessonRepository()
+            repository.reload()
+            lessons = repository.list_lessons()
+            total_lessons = len(lessons)
+            books = repository.books()
+            lines = ["[MCP测试] 课程库读取成功", f"总课程数：{total_lessons}"]
+            for book in books:
+                count = len(repository.list_lessons(book=book))
+                lines.append(f"· {book}: {count} 课")
+            message = "\n".join(lines)
+            logger.info(message)
+        except Exception as exc:  # pragma: no cover - 诊断信息主要用于界面反馈
+            message = f"[MCP测试] 读取课程库失败：{exc}"
+            logger.error(message, exc_info=True)
+
+        if self.display:
+            await self.display.update_text(message)
 
     async def _press(self):
         """
