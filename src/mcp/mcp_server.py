@@ -278,6 +278,14 @@ class McpServer:
         music_manager = get_music_tools_manager()
         music_manager.init_tools(self.add_tool, PropertyList, Property, PropertyType)
 
+        # 添加新概念英语课程工具
+        from src.mcp.tools.new_concept import get_new_concept_manager
+
+        new_concept_manager = get_new_concept_manager()
+        new_concept_manager.init_tools(
+            self.add_tool, PropertyList, Property, PropertyType
+        )
+
         # 添加摄像头工具
         from src.mcp.tools.camera import initialize_camera, take_photo
 

@@ -94,6 +94,14 @@ class ConfigManager:
             "VLapi_key": "",
             "models": "glm-4v-plus",
         },
+        "DEEPSEEK": {
+            "base_url": "https://api.deepseek.com/v1",
+            "api_key": "",
+            "model": "deepseek-chat",
+            "temperature": 0.7,
+            "timeout": 60,
+            "extra_headers": {},
+        },
         "SHORTCUTS": {
             "ENABLED": True,
             "MANUAL_PRESS": {"modifier": "ctrl", "key": "j", "description": "按住说话"},

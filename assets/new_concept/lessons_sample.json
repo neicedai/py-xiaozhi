@@ -1,0 +1,107 @@
+[
+  {
+    "book": "Book 1",
+    "lesson_number": 1,
+    "lesson_id": "B1L01",
+    "title": "Hello, I'm Sam!",
+    "summary": "Introduce greeting phrases, self-introductions, and asking someone's name through a short classroom story.",
+    "story_outline": [
+      "A new student named Sam arrives in class and meets the teacher and classmates.",
+      "Students practice greeting each other and asking for names.",
+      "The class finishes by playing a name circle game to remember everyone."
+    ],
+    "vocabulary": [
+      {
+        "phrase": "hello",
+        "translation": "你好",
+        "usage": "Say hello when you meet someone."
+      },
+      {
+        "phrase": "I'm ...",
+        "translation": "我是……",
+        "usage": "Introduce yourself with your name."
+      },
+      {
+        "phrase": "What's your name?",
+        "translation": "你叫什么名字？",
+        "usage": "Ask politely for someone's name."
+      },
+      {
+        "phrase": "Nice to meet you",
+        "translation": "很高兴认识你",
+        "usage": "Respond when you learn someone's name."
+      }
+    ],
+    "key_sentences": [
+      "Hello, I'm Sam.",
+      "What's your name?",
+      "Nice to meet you!"
+    ],
+    "grammar_points": [
+      "Using 'I am' and \"I'm\" for self-introduction.",
+      "Forming simple questions with 'What'."
+    ],
+    "activities": [
+      "Sing a greeting song with clapping rhythm.",
+      "Role-play meeting a new classmate using the key sentences.",
+      "Play a name chain game: each child repeats previous names and adds their own."
+    ],
+    "teaching_tips": "Encourage shy learners by letting them introduce a puppet or favorite toy first before speaking about themselves.",
+    "parent_extension": "Ask the child to introduce family members at home using 'This is ...' sentences."
+  },
+  {
+    "book": "Book 1",
+    "lesson_number": 2,
+    "lesson_id": "B1L02",
+    "title": "Look at the classroom",
+    "summary": "Teach classroom objects, using 'this is/that is' and simple imperatives for paying attention.",
+    "story_outline": [
+      "The teacher gives a quick tour of the classroom before the first art project.",
+      "Students practice saying what objects are and where they are.",
+      "A short clean-up challenge helps review vocabulary."
+    ],
+    "vocabulary": [
+      {
+        "phrase": "book",
+        "translation": "书",
+        "usage": "Point to a book when saying the word."
+      },
+      {
+        "phrase": "bag",
+        "translation": "书包",
+        "usage": "Ask: 'Whose bag is this?'"
+      },
+      {
+        "phrase": "desk",
+        "translation": "课桌",
+        "usage": "Tap the desk lightly to get attention."
+      },
+      {
+        "phrase": "This is...",
+        "translation": "这是……",
+        "usage": "Introduce an item close to you."
+      },
+      {
+        "phrase": "That is...",
+        "translation": "那是……",
+        "usage": "Introduce an item a little farther away."
+      }
+    ],
+    "key_sentences": [
+      "This is my desk.",
+      "That is our teacher.",
+      "Look!"
+    ],
+    "grammar_points": [
+      "Demonstratives 'this' and 'that'.",
+      "Imperatives for classroom instructions (Look!, Listen!, Touch...)."
+    ],
+    "activities": [
+      "Scavenger hunt: children find items the teacher names.",
+      "Drawing station: label a quick sketch of the classroom.",
+      "Clean-up countdown: say the target words while putting things away."
+    ],
+    "teaching_tips": "Use exaggerated gestures for 'this' and 'that' to reinforce distance differences.",
+    "parent_extension": "Invite the child to describe their study corner at home using 'This is ...' sentences."
+  }
+]
