@@ -20,7 +20,9 @@ done
 echo "🧹 开始代码格式化..."
 
 echo "🔧 检查并安装依赖包..."
-python -m pip install "${PIP_INSTALL_FLAGS[@]}" --upgrade pip >/dev/null
+if ! python -m pip install "${PIP_INSTALL_FLAGS[@]}" --upgrade pip >/dev/null 2>&1; then
+    echo "⚠️ pip 升级失败，继续使用当前版本。"
+fi
 python -m pip install "${PIP_INSTALL_FLAGS[@]}" autoflake docformatter isort black flake8 >/dev/null
 
 echo "📦 依赖包安装完成"
