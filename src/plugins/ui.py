@@ -1,3 +1,4 @@
+import json
 from typing import Any, Optional
 
 from src.constants.constants import AbortReason, DeviceState
@@ -181,6 +182,18 @@ class UIPlugin(Plugin):
             await self._run_new_concept_diagnostics()
             return True
 
+        start_course_triggers = {
+            "开始课程",
+            "课程开始",
+            "开始上课",
+            "start course",
+            "start lesson",
+            "#start-lesson",
+        }
+        if normalized in start_course_triggers:
+            await self._start_new_concept_course()
+            return True
+
         return False
 
     async def _run_new_concept_diagnostics(self) -> None:
@@ -202,6 +215,129 @@ class UIPlugin(Plugin):
             logger.info(message)
         except Exception as exc:  # pragma: no cover - 诊断信息主要用于界面反馈
             message = f"[MCP测试] 读取课程库失败：{exc}"
+            logger.error(message, exc_info=True)
+
+        if self.display:
+            await self.display.update_text(message)
+
+    async def _start_new_concept_course(self) -> None:
+        """自动准备并展示第一节新概念课程的教学提示."""
+
+        message = "[新概念课程] 暂未准备任何课程。"
+
+        try:
+            from src.mcp.mcp_server import McpServer
+            from src.mcp.tools.new_concept.data_loader import LessonRepository
+
+            repository = LessonRepository()
+            repository.reload()
+
+            books = repository.books()
+            if not books:
+                message = "[新概念课程] 未找到可用的教材数据。"
+            else:
+                book = books[0]
+                lessons = repository.list_lessons(book=book)
+                if not lessons:
+                    message = f"[新概念课程] {book} 暂无课程内容。"
+                else:
+                    lesson_entry = lessons[0]
+                    if lesson_entry.get("lesson_number") is not None:
+                        lesson_identifier = str(lesson_entry["lesson_number"])
+                    elif lesson_entry.get("lesson_id"):
+                        lesson_identifier = str(lesson_entry["lesson_id"])
+                    else:
+                        message = (
+                            "[新概念课程] 找到的课程缺少课次信息，无法自动开始。"
+                        )
+                        lesson_identifier = ""
+
+                    if lesson_identifier:
+                        server = McpServer.get_instance()
+                        tool = next(
+                            (t for t in server.tools if t.name == "education.new_concept.teach"),
+                            None,
+                        )
+
+                        if not tool:
+                            message = "[新概念课程] 教学工具尚未注册。"
+                        else:
+                            tool_response = await tool.call(
+                                {
+                                    "book": book,
+                                    "lesson": lesson_identifier,
+                                    "language": "zh",
+                                    "call_api": False,
+                                }
+                            )
+                            payload = json.loads(tool_response)
+                            if payload.get("isError"):
+                                error_text = next(
+                                    (
+                                        item.get("text", "")
+                                        for item in payload.get("content", [])
+                                        if item.get("type") == "text"
+                                    ),
+                                    "",
+                                )
+                                raise RuntimeError(
+                                    error_text or "调用课程工具失败"
+                                )
+
+                            data_text = next(
+                                (
+                                    item.get("text", "")
+                                    for item in payload.get("content", [])
+                                    if item.get("type") == "text"
+                                ),
+                                "",
+                            )
+                            if not data_text:
+                                raise ValueError("课程工具返回内容为空")
+
+                            lesson_data = json.loads(data_text)
+                            if not lesson_data.get("success"):
+                                message = (
+                                    lesson_data.get("message")
+                                    or "[新概念课程] 准备课程失败。"
+                                )
+                            else:
+                                prepared_lesson = lesson_data.get("lesson", {})
+                                summary = (
+                                    lesson_data.get("lesson_material", {}).get("summary")
+                                    or lesson_entry.get("summary")
+                                    or ""
+                                )
+                                prompts = lesson_data.get("prompts", {})
+                                user_prompt = (
+                                    prompts.get("user_prompt_full")
+                                    or prompts.get("user_prompt")
+                                )
+
+                                lines = ["[新概念课程] 已准备好第一节课程。"]
+                                lines.append(f"教材：{prepared_lesson.get('book', book)}")
+                                if prepared_lesson.get("lesson_number") is not None:
+                                    lines.append(
+                                        f"课次：Lesson {prepared_lesson['lesson_number']}"
+                                    )
+                                elif prepared_lesson.get("lesson_id"):
+                                    lines.append(
+                                        f"课次：{prepared_lesson['lesson_id']}"
+                                    )
+                                if prepared_lesson.get("title"):
+                                    lines.append(
+                                        f"标题：{prepared_lesson['title']}"
+                                    )
+                                if summary:
+                                    lines.append(f"概要：{summary}")
+                                if user_prompt:
+                                    lines.append("")
+                                    lines.append("教学指令：")
+                                    lines.append(user_prompt)
+
+                                message = "\n".join(lines)
+        except Exception as exc:  # pragma: no cover - 主要用于界面反馈
+            message = f"[新概念课程] 自动准备课程失败：{exc}"
             logger.error(message, exc_info=True)
 
         if self.display:
