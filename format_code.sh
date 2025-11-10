@@ -2,11 +2,26 @@
 
 set -euo pipefail
 
+PIP_INSTALL_FLAGS=()
+
+while (($#)); do
+    case "$1" in
+        --break-system-packages)
+            PIP_INSTALL_FLAGS+=("--break-system-packages")
+            ;;
+        *)
+            echo "❌ 未知参数: $1"
+            exit 1
+            ;;
+    esac
+    shift
+done
+
 echo "🧹 开始代码格式化..."
 
 echo "🔧 检查并安装依赖包..."
-python -m pip install --upgrade pip >/dev/null
-python -m pip install autoflake docformatter isort black flake8 >/dev/null
+python -m pip install "${PIP_INSTALL_FLAGS[@]}" --upgrade pip >/dev/null
+python -m pip install "${PIP_INSTALL_FLAGS[@]}" autoflake docformatter isort black flake8 >/dev/null
 
 echo "📦 依赖包安装完成"
 
