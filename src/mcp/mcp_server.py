@@ -567,6 +567,43 @@ class McpServer:
                     camera.set_explain_token(token)
                 logger.info(f"Vision service configured with URL: {url}")
 
+        # Xiaozhi may expose lesson/LLM services for New Concept tools via capabilities
+        education_caps = capabilities.get("education")
+        if isinstance(education_caps, dict):
+            new_concept_caps = education_caps.get("new_concept")
+        else:
+            new_concept_caps = None
+
+        if isinstance(new_concept_caps, dict):
+            # Support multiple shapes: direct {url, token}, or nested under "teach"/"service"
+            service_info = new_concept_caps.get("service") or new_concept_caps.get("teach")
+            if not isinstance(service_info, dict):
+                service_info = new_concept_caps
+
+            service_url = service_info.get("url")
+            if not service_url:
+                base_url = service_info.get("base_url") or service_info.get("baseUrl")
+                path = service_info.get("path")
+                if base_url and path:
+                    service_url = f"{str(base_url).rstrip('/')}/{str(path).lstrip('/')}"
+
+            if service_url:
+                from src.mcp.tools.new_concept.deepseek_client import (
+                    configure_deepseek_service,
+                )
+
+                configure_deepseek_service(
+                    service_url,
+                    service_info.get("token"),
+                    model=service_info.get("model"),
+                    headers=service_info.get("headers"),
+                    temperature=service_info.get("temperature"),
+                    timeout=service_info.get("timeout"),
+                )
+                logger.info(
+                    "[MCP] New Concept service configured with URL: %s", service_url
+                )
+
     async def _reply_result(self, id: int, result: Any):
         """
         发送成功响应.
