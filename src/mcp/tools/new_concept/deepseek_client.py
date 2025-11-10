@@ -66,7 +66,16 @@ class DeepSeekClient:
     ) -> None:
         """Configure Xiaozhi-hosted service endpoint for lesson generation."""
 
-        self.service_url = url.rstrip("/") if url else None
+        if isinstance(url, str):
+            self.service_url = url.rstrip("/")
+        elif url:
+            logger.warning(
+                "[NewConcept] Ignoring non-string service URL from capabilities: %s",
+                url,
+            )
+            self.service_url = None
+        else:
+            self.service_url = None
         self.service_token = token or None
 
         if model:
