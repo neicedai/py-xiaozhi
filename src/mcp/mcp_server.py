@@ -398,7 +398,13 @@ class McpServer:
         bazi_manager.init_tools(self.add_tool, PropertyList, Property, PropertyType)
 
         # 恢复原有工具
-        self.tools.extend(original_tools)
+        if original_tools:
+            existing_names = {tool.name for tool in self.tools}
+            for tool in original_tools:
+                if tool.name in existing_names:
+                    continue
+                self.tools.append(tool)
+                existing_names.add(tool.name)
 
     async def parse_message(self, message: Union[str, Dict[str, Any]]):
         """
