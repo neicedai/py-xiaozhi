@@ -1,5 +1,5 @@
 import json
-from typing import Any, Optional
+from typing import Any, Dict, Optional
 
 from src.constants.constants import AbortReason, DeviceState
 from src.plugins.base import Plugin
@@ -299,17 +299,32 @@ class UIPlugin(Plugin):
                                 )
                                 call_api = False
 
-                            tool_response = await tool.call(
-                                {
-                                    "book": book,
-                                    "lesson": lesson_identifier,
-                                    "language": "zh",
-                                    "call_api": call_api,
-                                }
-                            )
-                            payload = json.loads(tool_response)
-                            if payload.get("isError"):
-                                error_text = next(
+                            async def _call_new_concept_tool(
+                                call_api_flag: bool,
+                            ) -> Dict[str, Any]:
+                                tool_response = await tool.call(
+                                    {
+                                        "book": book,
+                                        "lesson": lesson_identifier,
+                                        "language": "zh",
+                                        "call_api": call_api_flag,
+                                    }
+                                )
+                                payload = json.loads(tool_response)
+                                if payload.get("isError"):
+                                    error_text = next(
+                                        (
+                                            item.get("text", "")
+                                            for item in payload.get("content", [])
+                                            if item.get("type") == "text"
+                                        ),
+                                        "",
+                                    )
+                                    raise RuntimeError(
+                                        error_text or "调用课程工具失败"
+                                    )
+
+                                data_text = next(
                                     (
                                         item.get("text", "")
                                         for item in payload.get("content", [])
@@ -317,23 +332,24 @@ class UIPlugin(Plugin):
                                     ),
                                     "",
                                 )
-                                raise RuntimeError(
-                                    error_text or "调用课程工具失败"
-                                )
+                                if not data_text:
+                                    raise ValueError("课程工具返回内容为空")
 
-                            data_text = next(
-                                (
-                                    item.get("text", "")
-                                    for item in payload.get("content", [])
-                                    if item.get("type") == "text"
-                                ),
-                                "",
-                            )
-                            if not data_text:
-                                raise ValueError("课程工具返回内容为空")
+                                data = json.loads(data_text)
+                                data.setdefault("call_api", call_api_flag)
+                                return data
 
-                            lesson_data = json.loads(data_text)
+                            lesson_data = await _call_new_concept_tool(call_api)
                             call_api_requested = lesson_data.get("call_api", call_api)
+
+                            if call_api and not lesson_data.get("success"):
+                                failure_message = str(lesson_data.get("message") or "")
+                                if "DeepSeek API 调用失败" in failure_message:
+                                    logger.info(
+                                        "[NewConcept] Falling back to offline lesson prompts"
+                                    )
+                                    lesson_data = await _call_new_concept_tool(False)
+                                    call_api_requested = lesson_data.get("call_api", False)
                             prepared_lesson = lesson_data.get("lesson", {})
                             material = lesson_data.get("lesson_material", {})
                             summary = (
