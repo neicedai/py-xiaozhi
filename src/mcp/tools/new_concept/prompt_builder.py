@@ -165,6 +165,12 @@ def _build_user_prompt(
     parent_label = "课后亲子延伸" if use_chinese else "Parent extension"
     tip_label = "授课提醒" if use_chinese else "Teacher tips"
 
+    parent_fallback = (
+        '建议复述课堂对话并分享给家长。'
+        if use_chinese
+        else 'Encourage the child to retell the story to their parents.'
+    )
+
     return (
         f"{heading}: {info_text}\n"
         f"{profile_label}: {profile_summary}\n\n"
@@ -175,7 +181,7 @@ def _build_user_prompt(
         f"{activity_label}:\n{activities_block}\n\n"
         f"{story_label}:\n{story_block}\n\n"
         f"{tip_label}: {tips if tips else ('保持课堂节奏轻快。' if use_chinese else 'Keep the pace upbeat and responsive.')}\n"
-        f"{parent_label}: {parent_tip if parent_tip else ('建议复述课堂对话并分享给家长。' if use_chinese else 'Encourage the child to retell today\'s story to parents.')}\n\n"
+        f"{parent_label}: {parent_tip if parent_tip else parent_fallback}\n\n"
         f"{deliver_label}:\n{phases_intro}"
     )
 
