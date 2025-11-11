@@ -175,7 +175,7 @@ def _build_user_prompt(
         f"{activity_label}:\n{activities_block}\n\n"
         f"{story_label}:\n{story_block}\n\n"
         f"{tip_label}: {tips if tips else ('保持课堂节奏轻快。' if use_chinese else 'Keep the pace upbeat and responsive.')}\n"
-        f"{parent_label}: {parent_tip if parent_tip else ('建议复述课堂对话并分享给家长。' if use_chinese else 'Encourage the child to retell today\'s story to parents.')}\n\n"
+        f"{parent_label}: {parent_tip if parent_tip else ('建议复述课堂对话并分享给家长。' if use_chinese else "Encourage the child to retell today's story to parents.")}\n\n"
         f"{deliver_label}:\n{phases_intro}"
     )
 
