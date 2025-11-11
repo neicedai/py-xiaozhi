@@ -282,12 +282,29 @@ class UIPlugin(Plugin):
                         if not tool:
                             message = "[新概念课程] 教学工具尚未注册。"
                         else:
+                            try:
+                                from src.mcp.tools.new_concept.deepseek_client import (
+                                    get_deepseek_client,
+                                )
+
+                                deepseek_client = get_deepseek_client()
+                                call_api = bool(
+                                    deepseek_client.has_service()
+                                    or deepseek_client.has_direct_credentials()
+                                )
+                            except Exception as exc:  # pragma: no cover - defensive
+                                logger.warning(
+                                    "[NewConcept] Failed to check DeepSeek availability: %s",
+                                    exc,
+                                )
+                                call_api = False
+
                             tool_response = await tool.call(
                                 {
                                     "book": book,
                                     "lesson": lesson_identifier,
                                     "language": "zh",
-                                    "call_api": False,
+                                    "call_api": call_api,
                                 }
                             )
                             payload = json.loads(tool_response)
@@ -316,26 +333,49 @@ class UIPlugin(Plugin):
                                 raise ValueError("课程工具返回内容为空")
 
                             lesson_data = json.loads(data_text)
-                            if not lesson_data.get("success"):
+                            call_api_requested = lesson_data.get("call_api", call_api)
+                            prepared_lesson = lesson_data.get("lesson", {})
+                            material = lesson_data.get("lesson_material", {})
+                            summary = (
+                                material.get("summary")
+                                or lesson_entry.get("summary")
+                                or ""
+                            )
+                            vocabulary = self._format_brief_list(
+                                material.get("vocabulary")
+                            )
+                            key_sentences = self._format_brief_list(
+                                material.get("key_sentences")
+                            )
+                            model_output = self._extract_model_output(
+                                lesson_data.get("deepseek_response")
+                            )
+
+                            lesson_ready = lesson_data.get("success") or (
+                                call_api_requested
+                                and bool(prepared_lesson)
+                            )
+
+                            if not lesson_ready:
                                 message = (
                                     lesson_data.get("message")
                                     or "[新概念课程] 准备课程失败。"
                                 )
                             else:
-                                prepared_lesson = lesson_data.get("lesson", {})
-                                summary = (
-                                    lesson_data.get("lesson_material", {}).get("summary")
-                                    or lesson_entry.get("summary")
-                                    or ""
-                                )
-                                prompts = lesson_data.get("prompts", {})
-                                user_prompt = (
-                                    prompts.get("user_prompt_full")
-                                    or prompts.get("user_prompt")
-                                )
+                                lines = []
+                                if lesson_data.get("success"):
+                                    lines.append("[新概念课程] 已准备好第一节课程。")
+                                else:
+                                    fallback_message = (
+                                        lesson_data.get("message")
+                                        or "DeepSeek API 调用失败，已显示本地课程提示。"
+                                    )
+                                    lines.append("[新概念课程] 已准备好第一节课程（离线模式）。")
+                                    lines.append(f"提示：{fallback_message}")
 
-                                lines = ["[新概念课程] 已准备好第一节课程。"]
-                                lines.append(f"教材：{prepared_lesson.get('book', book)}")
+                                lines.append(
+                                    f"教材：{prepared_lesson.get('book', book)}"
+                                )
                                 if prepared_lesson.get("lesson_number") is not None:
                                     lines.append(
                                         f"课次：Lesson {prepared_lesson['lesson_number']}"
@@ -350,10 +390,18 @@ class UIPlugin(Plugin):
                                     )
                                 if summary:
                                     lines.append(f"概要：{summary}")
-                                if user_prompt:
+                                if vocabulary:
+                                    lines.append(f"关键词汇：{vocabulary}")
+                                if key_sentences:
+                                    lines.append(f"重点句型：{key_sentences}")
+
+                                if model_output:
                                     lines.append("")
-                                    lines.append("教学指令：")
-                                    lines.append(user_prompt)
+                                    lines.append("AI 课堂示范：")
+                                    lines.append(model_output)
+                                elif lesson_data.get("message") and lesson_data.get("success"):
+                                    lines.append("")
+                                    lines.append(lesson_data.get("message"))
 
                                 message = "\n".join(lines)
         except Exception as exc:  # pragma: no cover - 主要用于界面反馈
@@ -362,6 +410,106 @@ class UIPlugin(Plugin):
 
         if self.display:
             await self.display.update_text(message)
+
+    @staticmethod
+    def _format_brief_list(value: Any, limit: int = 3) -> str:
+        """Convert lesson material entries to a short, human-friendly summary."""
+
+        if not value:
+            return ""
+
+        items: list[str] = []
+        candidates: list[Any]
+        if isinstance(value, dict):
+            candidates = [value]
+        elif isinstance(value, (list, tuple, set)):
+            candidates = list(value)
+        else:
+            candidates = [value]
+
+        for entry in candidates:
+            text = ""
+            if isinstance(entry, dict):
+                text = (
+                    str(
+                        entry.get("phrase")
+                        or entry.get("word")
+                        or entry.get("term")
+                        or entry.get("text")
+                        or entry.get("sentence")
+                        or next(iter(entry.values()), "")
+                    )
+                    if entry
+                    else ""
+                )
+            else:
+                text = str(entry)
+
+            text = text.strip()
+            if text:
+                items.append(text)
+            if len(items) >= limit:
+                break
+
+        return "、".join(items[:limit]) if items else ""
+
+    @staticmethod
+    def _extract_model_output(payload: Any) -> str:
+        """Extract a readable lesson script from DeepSeek or service responses."""
+
+        if not payload:
+            return ""
+
+        if isinstance(payload, str):
+            return payload.strip()
+
+        if isinstance(payload, dict):
+            choices = payload.get("choices")
+            fragments: list[str] = []
+            if isinstance(choices, list):
+                for choice in choices:
+                    if not isinstance(choice, dict):
+                        continue
+                    message = choice.get("message")
+                    if isinstance(message, dict):
+                        content = message.get("content")
+                        if isinstance(content, str) and content.strip():
+                            fragments.append(content.strip())
+                    text = choice.get("text")
+                    if isinstance(text, str) and text.strip():
+                        fragments.append(text.strip())
+                if fragments:
+                    # Preserve order while removing duplicates
+                    seen = set()
+                    ordered = []
+                    for fragment in fragments:
+                        if fragment in seen:
+                            continue
+                        seen.add(fragment)
+                        ordered.append(fragment)
+                    return "\n\n".join(ordered)
+
+            raw_text = payload.get("raw")
+            if isinstance(raw_text, str) and raw_text.strip():
+                return raw_text.strip()
+
+            message_text = payload.get("message")
+            if isinstance(message_text, str) and message_text.strip():
+                return message_text.strip()
+
+            data_field = payload.get("data")
+            if isinstance(data_field, (dict, list, str)):
+                extracted = UIPlugin._extract_model_output(data_field)
+                if extracted:
+                    return extracted
+
+        if isinstance(payload, list):
+            fragments = [UIPlugin._extract_model_output(item) for item in payload]
+            fragments = [fragment for fragment in fragments if fragment]
+            if fragments:
+                return "\n\n".join(fragments)
+
+        return ""
 
     async def _press(self):
         """
