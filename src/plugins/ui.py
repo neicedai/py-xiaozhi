@@ -282,12 +282,29 @@ class UIPlugin(Plugin):
                         if not tool:
                             message = "[新概念课程] 教学工具尚未注册。"
                         else:
+                            try:
+                                from src.mcp.tools.new_concept.deepseek_client import (
+                                    get_deepseek_client,
+                                )
+
+                                deepseek_client = get_deepseek_client()
+                                call_api = bool(
+                                    deepseek_client.has_service()
+                                    or deepseek_client.has_direct_credentials()
+                                )
+                            except Exception as exc:  # pragma: no cover - defensive
+                                logger.warning(
+                                    "[NewConcept] Failed to check DeepSeek availability: %s",
+                                    exc,
+                                )
+                                call_api = False
+
                             tool_response = await tool.call(
                                 {
                                     "book": book,
                                     "lesson": lesson_identifier,
                                     "language": "zh",
-                                    "call_api": True,
+                                    "call_api": call_api,
                                 }
                             )
                             payload = json.loads(tool_response)
@@ -316,31 +333,49 @@ class UIPlugin(Plugin):
                                 raise ValueError("课程工具返回内容为空")
 
                             lesson_data = json.loads(data_text)
-                            if not lesson_data.get("success"):
+                            call_api_requested = lesson_data.get("call_api", call_api)
+                            prepared_lesson = lesson_data.get("lesson", {})
+                            material = lesson_data.get("lesson_material", {})
+                            summary = (
+                                material.get("summary")
+                                or lesson_entry.get("summary")
+                                or ""
+                            )
+                            vocabulary = self._format_brief_list(
+                                material.get("vocabulary")
+                            )
+                            key_sentences = self._format_brief_list(
+                                material.get("key_sentences")
+                            )
+                            model_output = self._extract_model_output(
+                                lesson_data.get("deepseek_response")
+                            )
+
+                            lesson_ready = lesson_data.get("success") or (
+                                call_api_requested
+                                and bool(prepared_lesson)
+                            )
+
+                            if not lesson_ready:
                                 message = (
                                     lesson_data.get("message")
                                     or "[新概念课程] 准备课程失败。"
                                 )
                             else:
-                                prepared_lesson = lesson_data.get("lesson", {})
-                                material = lesson_data.get("lesson_material", {})
-                                summary = (
-                                    material.get("summary")
-                                    or lesson_entry.get("summary")
-                                    or ""
-                                )
-                                vocabulary = self._format_brief_list(
-                                    material.get("vocabulary")
-                                )
-                                key_sentences = self._format_brief_list(
-                                    material.get("key_sentences")
-                                )
-                                model_output = self._extract_model_output(
-                                    lesson_data.get("deepseek_response")
-                                )
+                                lines = []
+                                if lesson_data.get("success"):
+                                    lines.append("[新概念课程] 已准备好第一节课程。")
+                                else:
+                                    fallback_message = (
+                                        lesson_data.get("message")
+                                        or "DeepSeek API 调用失败，已显示本地课程提示。"
+                                    )
+                                    lines.append("[新概念课程] 已准备好第一节课程（离线模式）。")
+                                    lines.append(f"提示：{fallback_message}")
 
-                                lines = ["[新概念课程] 已准备好第一节课程。"]
-                                lines.append(f"教材：{prepared_lesson.get('book', book)}")
+                                lines.append(
+                                    f"教材：{prepared_lesson.get('book', book)}"
+                                )
                                 if prepared_lesson.get("lesson_number") is not None:
                                     lines.append(
                                         f"课次：Lesson {prepared_lesson['lesson_number']}"
@@ -364,7 +399,7 @@ class UIPlugin(Plugin):
                                     lines.append("")
                                     lines.append("AI 课堂示范：")
                                     lines.append(model_output)
-                                elif lesson_data.get("message"):
+                                elif lesson_data.get("message") and lesson_data.get("success"):
                                     lines.append("")
                                     lines.append(lesson_data.get("message"))
 
