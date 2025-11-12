@@ -1,5 +1,5 @@
 import json
-from typing import Any, Optional
+from typing import Any, Dict, Optional
 
 from src.constants.constants import AbortReason, DeviceState
 from src.plugins.base import Plugin
@@ -403,6 +403,26 @@ class UIPlugin(Plugin):
                                     lines.append("")
                                     lines.append(lesson_data.get("message"))
 
+                                prompt_sent = False
+                                if not model_output:
+                                    prompt_text = self._build_model_prompt(
+                                        prepared_lesson,
+                                        material,
+                                        lesson_data.get("prompts", {}),
+                                        summary=summary,
+                                        vocabulary=vocabulary,
+                                        key_sentences=key_sentences,
+                                    )
+                                    if prompt_text:
+                                        prompt_sent = await self._dispatch_lesson_prompt(
+                                            prompt_text
+                                        )
+                                if prompt_sent:
+                                    lines.append("")
+                                    lines.append(
+                                        "[新概念课程] 已向教学模型发送课程资料，课堂即将开始。"
+                                    )
+
                                 message = "\n".join(lines)
         except Exception as exc:  # pragma: no cover - 主要用于界面反馈
             message = f"[新概念课程] 自动准备课程失败：{exc}"
@@ -452,6 +472,108 @@ class UIPlugin(Plugin):
                 break
 
         return "、".join(items[:limit]) if items else ""
+
+    def _build_model_prompt(
+        self,
+        prepared_lesson: Dict[str, Any],
+        lesson_material: Dict[str, Any],
+        prompts: Dict[str, Any],
+        *,
+        summary: str,
+        vocabulary: str,
+        key_sentences: str,
+    ) -> str:
+        """Compose a detailed instruction message for the conversational model."""
+
+        book = prepared_lesson.get("book") or lesson_material.get("book") or ""
+        lesson_number = (
+            prepared_lesson.get("lesson_number")
+            or prepared_lesson.get("lesson_id")
+            or lesson_material.get("lesson_id")
+        )
+        title = prepared_lesson.get("title") or lesson_material.get("title") or ""
+
+        header_lines = [
+            "课程开始。请立即以耐心、鼓励式的少儿英语老师身份与学生互动上课。",
+        ]
+        info_parts = []
+        if book:
+            info_parts.append(str(book))
+        if lesson_number:
+            info_parts.append(f"Lesson {lesson_number}")
+        if title:
+            info_parts.append(str(title))
+        if info_parts:
+            header_lines.append("课程信息：" + " - ".join(info_parts))
+
+        if summary:
+            header_lines.append(f"课程概要：{summary}")
+        if vocabulary:
+            header_lines.append(f"关键词汇：{vocabulary}")
+        if key_sentences:
+            header_lines.append(f"重点句型：{key_sentences}")
+
+        system_prompt = (prompts.get("system_prompt") or "").strip()
+        user_prompt = (
+            prompts.get("user_prompt_full")
+            or prompts.get("user_prompt")
+            or ""
+        ).strip()
+
+        body_lines = [
+            "请遵循下列教学要求与流程，主动提问并等待学生回应，如无回应请给出示范。",
+        ]
+        if system_prompt:
+            body_lines.append("【教学风格要求】")
+            body_lines.append(system_prompt)
+        if user_prompt:
+            body_lines.append("")
+            body_lines.append("【课堂流程提示】")
+            body_lines.append(user_prompt)
+
+        extras = []
+        activities = lesson_material.get("activities")
+        if activities and not user_prompt:
+            extras.append(
+                "课堂活动建议：" + "；".join(str(item) for item in activities if item)
+            )
+        parent_extension = lesson_material.get("parent_extension")
+        if parent_extension:
+            extras.append(f"课后建议：{parent_extension}")
+        teaching_tips = lesson_material.get("teaching_tips")
+        if teaching_tips:
+            extras.append(f"授课提醒：{teaching_tips}")
+        if extras:
+            body_lines.append("")
+            body_lines.extend(extras)
+
+        message = "\n".join(header_lines + [""] + body_lines)
+        return message.strip()
+
+    async def _dispatch_lesson_prompt(self, prompt_text: str) -> bool:
+        """Send the prepared lesson prompt to the active conversational protocol."""
+
+        if not prompt_text.strip():
+            return False
+        app = self.app
+        if not app or not getattr(app, "protocol", None):
+            return False
+
+        try:
+            connected = await app.connect_protocol()
+        except Exception as exc:  # pragma: no cover - safeguard
+            logger.error("[NewConcept] Failed to connect protocol: %s", exc, exc_info=True)
+            return False
+
+        if not connected:
+            return False
+
+        try:
+            await app.protocol.send_wake_word_detected(prompt_text)
+            return True
+        except Exception as exc:  # pragma: no cover - communication failure
+            logger.error("[NewConcept] Failed to dispatch lesson prompt: %s", exc, exc_info=True)
+            return False
 
     @staticmethod
     def _extract_model_output(payload: Any) -> str:
