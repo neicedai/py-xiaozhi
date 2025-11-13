@@ -210,17 +210,40 @@ class WebAudioClient {
         console.warn("恢复音频上下文失败", error);
       }
     }
+    if (!navigator?.mediaDevices?.getUserMedia) {
+      throw new Error("浏览器不支持麦克风或权限不可用");
+    }
+    const insecureOrigin =
+      !window.isSecureContext &&
+      !["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
+    if (insecureOrigin) {
+      throw new Error("麦克风访问需要通过 HTTPS 或 localhost 打开页面");
+    }
     try {
-      this.mediaStream = await navigator.mediaDevices.getUserMedia({
+      const constraints = {
         audio: {
-          channelCount: 1,
-          noiseSuppression: false,
-          echoCancellation: false,
-          autoGainControl: false,
+          channelCount: { ideal: 1 },
+          noiseSuppression: { ideal: false },
+          echoCancellation: { ideal: false },
+          autoGainControl: { ideal: false },
         },
-      });
+      };
+      this.mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
     } catch (error) {
-      throw new Error("无法访问麦克风：" + (error.message || "权限被拒绝"));
+      if (
+        error &&
+        ["OverconstrainedError", "ConstraintNotSatisfiedError", "NotFoundError"].includes(
+          error.name,
+        )
+      ) {
+        try {
+          this.mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        } catch (fallbackError) {
+          throw new Error(this._describeGetUserMediaError(fallbackError));
+        }
+      } else {
+        throw new Error(this._describeGetUserMediaError(error));
+      }
     }
     this.sourceNode = context.createMediaStreamSource(this.mediaStream);
     this.processorNode = context.createScriptProcessor(4096, 1, 1);
@@ -390,6 +413,30 @@ class WebAudioClient {
     result.set(current, 0);
     result.set(append, current.length);
     return result;
+  }
+
+  _describeGetUserMediaError(error) {
+    if (!error) {
+      return "无法访问麦克风";
+    }
+    const name = error.name || "";
+    if (name === "NotAllowedError" || name === "SecurityError") {
+      return "麦克风权限被拒绝，请在浏览器中授权访问";
+    }
+    if (name === "NotFoundError" || name === "DevicesNotFoundError") {
+      return "未检测到麦克风设备或已被其他程序占用";
+    }
+    if (name === "OverconstrainedError" || name === "ConstraintNotSatisfiedError") {
+      const constraint = error.constraint || (error.constraints && error.constraints[0]);
+      if (constraint) {
+        return `当前设备不支持所请求的麦克风参数 (${constraint})`;
+      }
+      return "当前设备不支持请求的麦克风参数";
+    }
+    if (name === "NotReadableError" || name === "TrackStartError") {
+      return "浏览器无法访问麦克风，可能被系统或其他应用占用";
+    }
+    return error.message || "无法访问麦克风";
   }
 
   _playSpeaker(buffer) {

@@ -241,7 +241,11 @@ class WebRuntime:
     # ------------------------------------------------------------------
     async def open_camera(self, force: bool = False) -> None:
         async with self._camera_lock:
-            await asyncio.to_thread(initialize_camera, force)
+            success = await asyncio.to_thread(self._initialize_camera_sync, force)
+            if not success:
+                raise HTTPException(
+                    status.HTTP_503_SERVICE_UNAVAILABLE, "未检测到可用的摄像头设备"
+                )
 
     async def close_camera(self) -> None:
         async with self._camera_lock:
@@ -297,6 +301,22 @@ class WebRuntime:
             return
         logging.getLogger().removeHandler(self._log_handler)
         self._log_handler = None
+
+    @staticmethod
+    def _initialize_camera_sync(force: bool) -> bool:
+        try:
+            initialize_camera(force_reopen=force)
+        except TypeError:
+            # 兼容旧的函数签名（仅用于防御性处理）
+            initialize_camera(force)
+        except Exception:
+            LOGGER.debug("Failed to initialize camera", exc_info=True)
+            return False
+        try:
+            return is_camera_active()
+        except Exception:
+            LOGGER.debug("Camera active check failed", exc_info=True)
+            return False
 
     def _require_app(self) -> Application:
         if not self._app:
